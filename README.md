@@ -79,3 +79,18 @@ npx clerk@latest deploy status
 For independent Cloudflare hosting, build and create your own Wrangler deployment config based on `dist/server/wrangler.json`: set your Worker name, real D1 database ID, R2 bucket, `migrations_dir`, and asset directory. Apply migrations to your remote database, configure `CLERK_SECRET_KEY` using Wrangler secrets, and build with your production `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`. Never put the secret key in vars, source control or client bundles. Use your own domain matching the Clerk production instance. Deploy with `wrangler deploy` after applying migrations.
 
 The dark charcoal/slate design follows the supplied editor reference, with cyan tools and active rows, warm orange scoring actions, and lazy PDF thumbnails. The local server explicitly serves static assets before invoking the framework Worker; the PDF.js worker is bundled as a versioned URL. This avoids the empty framework static-file marker response that originally prevented PDF loading.
+
+## Account preferences and test deployment
+
+Nastavenia beside the account saves per-tool color, line width and text font/size/bold/italic (including the grading stamp). Defaults, each project's selected categories and alphabetical/graded-first sorting are stored in the signed-in user's Clerk metadata. Category display uses 5–9 and prima/sekunda/tercia/kvarta; ZIP codes remain unchanged. Zrušiť hodnotenie removes the score and its stamp and supports undo.
+
+The independent Cloudflare test environment uses `wrangler.test.json`, a separate D1 database and R2 bucket. It uses Clerk development credentials for testing on workers.dev, not a production Clerk instance. It starts with an empty project database; local project files are not copied automatically.
+
+```sh
+npm run build
+node scripts/prepare-cloudflare-test.mjs
+npx wrangler d1 migrations apply opravovna-test --remote --config wrangler.test.json
+npx wrangler deploy --config wrangler.test.json
+```
+
+Set Clerk runtime keys using Wrangler secrets (never commit their values). Rebuild after changes to the publishable key.

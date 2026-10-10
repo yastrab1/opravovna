@@ -24,6 +24,8 @@ try{
  assert.equal((await req(viewer,base)).status,200);assert.equal((await req(viewer,base+'/documents/'+did,'PATCH',{state,revision:1})).status,403);
  assert.equal((await req(editor,base+'/members')).status,403);
  assert.equal((await req(editor,base+'/documents/'+did,'PATCH',{state:{...state,scoring:{points:4.67}},revision:1})).status,200);
+ assert.equal((await req(editor,base+'/documents/'+did,'PATCH',{state:{...state,scoring:{},changes:[]},revision:2})).status,200);
+ r=await req(owner,base);assert.equal(r.data.documents[0].state.scoring.points,undefined,'Removed grade stays removed after reload');
  assert.equal((await req(owner,base,'PATCH',{title:'Unsafe'},{origin:'https://evil.test'})).status,403);
  r=await req(owner,base+'/share','POST',{});const token=r.data.token;
  assert.equal((await req(outsider,'join','POST',{token})).status,200);assert.equal((await req(outsider,base)).status,200);
