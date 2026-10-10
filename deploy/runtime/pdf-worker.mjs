@@ -56,7 +56,7 @@ function validateImages(value) {
 parentPort.on('message', async ({ id, bytes, state }) => {
   try {
     validateImages(state.changes);
-    const output = await flattenPdfWith(bytes, state, { fabric, pdfjs: async () => js, loadObjects });
+    const output = await flattenPdfWith(bytes, state, { fabric, pdfjs: async () => js, loadObjects, createCanvas: (width, height) => napi.createCanvas(width, height) });
     parentPort.postMessage({ id, bytes: output }, [output.buffer]);
   } catch (error) {
     console.error('PDF export failed:', error.message);
