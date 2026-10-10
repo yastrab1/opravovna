@@ -1,14 +1,12 @@
+import { documentTagStatements } from "./document-tags";
+import { replaceDocumentVersion } from "./document-version";
 import { parseSubmission, projectTitle } from "../archive";
 import { body, fail, id, json, readBytes, type ApiContext } from "./http";
 import { validateState } from "./validate-state";
-export async function handleDocuments({
-  req,
-  DB,
-  BUCKET,
-  url,
-  p,
-  project,
-}: ApiContext): Promise<Response | null> {
+export async function handleDocuments(
+  context: ApiContext,
+): Promise<Response | null> {
+  const { req, DB, BUCKET, url, p, project } = context;
   if (p[2] === "documents" && !p[3] && req.method === "POST") {
     const path = decodeURIComponent(req.headers.get("x-file-path") || "");
     let meta;
@@ -77,6 +75,8 @@ export async function handleDocuments({
       .bind(p[3], project.id)
       .first<any>();
     if (!doc) fail("PDF neexistuje.", 404);
+    if (p[4] === "version" && req.method === "PUT")
+      return replaceDocumentVersion(context, doc);
     if (p[4] === "file" && req.method === "GET") {
       const key =
         url.searchParams.get("graded") === "1" && doc.graded
@@ -105,38 +105,16 @@ export async function handleDocuments({
         .run();
       return json({ ok: true });
     }
-    if (req.method === "PATCH") {
+    if (!p[4] && req.method === "PATCH") {
       const b = await body(req);
       if (!Number.isInteger(b.revision)) fail("Neplatná revízia.");
       validateState(b.state);
       const state = JSON.stringify(b.state);
-      const catalogTags = [
-        ...(JSON.parse(doc.state).tags ?? []),
-        ...b.state.tags,
-      ].filter(
-        (tag: any) => typeof tag === "string" || typeof tag?.name === "string",
-      );
       const [out] = await DB.batch([
         DB.prepare(
           "UPDATE documents SET state=?, revision=revision+1, updated=? WHERE id=? AND revision=?",
         ).bind(state, Date.now(), doc.id, b.revision),
-        // Persist the project vocabulary even when the last assignment is removed.
-        // JSON append runs atomically with the revision update, so reviewers cannot
-        // overwrite each other's tags or add tags through a stale document save.
-        ...catalogTags.map((tag: any) =>
-          DB.prepare(
-            `UPDATE projects SET legacy=json_set(legacy,'$.tags',json_insert(COALESCE(json_extract(legacy,'$.tags'),'[]'),'$[#]',json(?)))
-     WHERE id=? AND EXISTS(SELECT 1 FROM documents WHERE id=? AND revision=? AND state=?)
-     AND NOT EXISTS(SELECT 1 FROM json_each(COALESCE(json_extract(projects.legacy,'$.tags'),'[]')) t WHERE CASE WHEN t.type='object' THEN json_extract(t.value,'$.name') ELSE t.value END=?)`,
-          ).bind(
-            JSON.stringify(tag),
-            project.id,
-            doc.id,
-            b.revision + 1,
-            state,
-            typeof tag === "string" ? tag : tag.name,
-          ),
-        ),
+        ...documentTagStatements(DB, project.id, doc, b.state, b.revision + 1),
       ]);
       if (!out.meta.changes)
         return json(

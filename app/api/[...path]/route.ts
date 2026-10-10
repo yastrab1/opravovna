@@ -125,7 +125,7 @@ async function handle(req: Request) {
           share: role === "owner" ? project.share : undefined,
           documents: (
             await DB.prepare(
-              "SELECT id,path,metadata,state,revision,updated,graded FROM documents WHERE project=? ORDER BY path",
+              "SELECT id,path,metadata,state,revision,updated,graded,original AS fileVersion FROM documents WHERE project=? ORDER BY path",
             )
               .bind(project.id)
               .all()

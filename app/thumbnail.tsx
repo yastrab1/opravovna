@@ -17,17 +17,21 @@ async function slot() {
 export default function Thumbnail({
   project,
   id,
+  version,
 }: {
   project: string;
   id: string;
+  version?: string;
 }) {
+  const cacheKey = `${project}/${id}/${version ?? "original"}`;
   const element = useRef<HTMLSpanElement>(null);
-  const [src, setSrc] = useState(cache.get(id));
+  const [src, setSrc] = useState(cache.get(cacheKey));
   useEffect(() => {
-    if (cache.has(id)) {
-      setSrc(cache.get(id));
+    if (cache.has(cacheKey)) {
+      setSrc(cache.get(cacheKey));
       return;
     }
+    setSrc(undefined);
     const abort = new AbortController();
     let task: any;
     let started = false;
@@ -63,7 +67,7 @@ export default function Thumbnail({
             }).promise;
             const data = canvas.toDataURL("image/webp", 0.75);
             if (!abort.signal.aborted) {
-              cache.set(id, data);
+              cache.set(cacheKey, data);
               if (cache.size > 120) cache.delete(cache.keys().next().value!);
               setSrc(data);
             }
@@ -83,7 +87,7 @@ export default function Thumbnail({
       observer.disconnect();
       task?.destroy();
     };
-  }, [id, project]);
+  }, [id, project, cacheKey]);
   return (
     <span className="thumbnail" ref={element}>
       {src ? <img src={src} alt="" /> : <FileText size={22} strokeWidth={1} />}

@@ -12,6 +12,7 @@
 | Scan rotation | Cropping a rendered page also captured PDF headers and surrounding decoration. The renderer now decodes the embedded raster itself, reserves header space, centers it and fits it to the available area. Preview/export use the same layout and clockwise orientation. Unsupported pages are rejected before recording a rotation. |
 | Canvas lifecycle | Fabric wrapped a React-owned canvas, creating competing DOM ownership during page changes. React now owns an empty host and Fabric owns the inserted canvas. Disposal completes before the next canvas initializes. Inactive pages render annotation previews. |
 | Saving and synchronization | Edits arriving during an in-flight save could be left behind when switching documents. The save queue drains pending changes and updates revisions immediately. Stale polling responses are ignored after changing projects. |
+| Merge PDF versions | Choosing an incoming version now commits its PDF and state together using an optimistic revision check. Replayed uploads are idempotent, previews use the actual incoming PDF, and editor/thumbnail caches follow file versions. Duplicate detection no longer hides changed drawings behind identical original bytes. |
 | Export contract | Browser and server export implementations duplicated archive assembly. Shared helpers preserve original PDF basenames, include only graded PDFs, write Arnold's root `/points.json` entry and reject duplicate basenames. No wrapper folder or `_graded` suffix is introduced. |
 | Export isolation | The runtime separates jobs, archive packing and a bounded thread pool. Job/download access is scoped to the initiating account and current project permission. External annotation image references are rejected in both renderers. |
 | Maintainability | Workspace/editor composition, persistence, dialogs, import preparation, API handlers and renderer tasks have focused modules. Unused starter UI and dependencies were removed. Application TypeScript/JavaScript files have an enforced 300-line ceiling. |
@@ -48,4 +49,4 @@ ESLint exits successfully. Remaining warnings identify deliberately stable ref-b
 
 ## Release status
 
-The score fix is deployed. Decoder assets, resilient imports, comment wrapping and the final review changes are prepared locally and are intentionally awaiting the next deployment instruction. The local review image is smoke-tested separately from production.
+The reviewed release includes score corrections, decoder assets, resilient imports, comment wrapping and atomic PDF-version merging. It is tested in an isolated container before the unified stack is updated to a pinned image digest.

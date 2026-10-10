@@ -25,6 +25,8 @@ export async function sameGradedSubmission(
 ) {
   if (
     doc.state.scoring?.points !== incoming.scoring?.points ||
+    JSON.stringify(doc.state.tags ?? []) !==
+      JSON.stringify(incoming.tags ?? []) ||
     JSON.stringify(stateComments(doc.state)) !==
       JSON.stringify(stateComments(incoming))
   )
@@ -39,8 +41,10 @@ export async function sameGradedSubmission(
     }
   };
   const base = `/api/projects/${projectId}/documents/${doc.id}/file`;
-  if (doc.graded && (await matches(base + "?graded=1"))) return true;
-  if (await matches(base)) return true;
+  const visualState = (s: any) =>
+    JSON.stringify([s.changes ?? [], s.rotations ?? {}, s.extraPages ?? 0]);
+  if (visualState(doc.state) === visualState(incoming) && (await matches(base)))
+    return true;
   const state = doc.state;
   if (
     !state.changes?.length &&

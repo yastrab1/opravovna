@@ -80,7 +80,7 @@ export function usePdfPages({
       void loadingTask?.destroy();
       pdf.current = null;
     };
-  }, [doc.id, projectId]);
+  }, [doc.id, projectId, doc.fileVersion]);
   useEffect(() => {
     if (!ready || !pdf.current) return;
     let canceled = false;

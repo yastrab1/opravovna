@@ -77,7 +77,9 @@ export async function createApiFixture() {
           ...(body !== undefined
             ? {
                 body:
-                  typeof body === "object" && !(body instanceof Uint8Array)
+                  typeof body === "object" &&
+                  !(body instanceof Uint8Array) &&
+                  !(body instanceof FormData)
                     ? JSON.stringify(body)
                     : body,
               }

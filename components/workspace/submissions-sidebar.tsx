@@ -150,7 +150,7 @@ export default function SubmissionsSidebar({
             className={"documentrow " + (active === d.id ? "selected" : "")}
             onClick={() => switchDoc(d.id)}
           >
-            <Thumbnail project={project.id} id={d.id} />
+            <Thumbnail project={project.id} id={d.id} version={d.fileVersion} />
             <span>
               <strong>{d.metadata.name}</strong>
               <small>

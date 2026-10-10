@@ -4,17 +4,15 @@ export async function api(path: string, init: RequestInit = {}): Promise<any> {
   const retryable = ["GET", "HEAD", "PUT"].includes(
     (init.method ?? "GET").toUpperCase(),
   );
+  const headers = new Headers(init.headers);
+  if (typeof init.body === "string" && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
       res = await fetch("/api/" + path, {
         ...init,
-        headers: {
-          ...(typeof init.body === "string"
-            ? { "Content-Type": "application/json" }
-            : {}),
-          ...init.headers,
-        },
+        headers,
       });
     } catch (cause) {
       if (init.signal?.aborted) throw cause;

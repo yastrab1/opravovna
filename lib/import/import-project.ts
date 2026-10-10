@@ -1,3 +1,4 @@
+import { writeImportedVersion } from "./write-version";
 import { uploadArchive } from "./upload-archive";
 import {
   gradedFilePath,
@@ -7,7 +8,7 @@ import {
 import { api } from "../client-api";
 import { mergeDecision } from "../merge";
 import { normalizeArnoldLegacy } from "../tags";
-import { sameGradedSubmission } from "./equivalence";
+import { sameGradedSubmission, sameBytes } from "./equivalence";
 import { prepareScores, type CorrectScores } from "./prepare-scores";
 export async function importZip(
   file: File,
@@ -64,6 +65,14 @@ export async function importZip(
       throw new Error(
         "ZIP neobsahuje riešenia vo formáte p4-c8-meno-12345.pdf.",
       );
+    const submissionIds = pdfs.map(
+      (f) =>
+        parseSubmission(
+          gradedOnly ? f.name.replace(/_graded\.pdf$/i, ".pdf") : f.name,
+        )!.submissionId,
+    );
+    if (new Set(submissionIds).size !== submissionIds.length)
+      throw new Error("Archív obsahuje viac PDF pre rovnaké riešenie.");
     if (pdfs.length > 2000) throw new Error("Najviac 2000 riešení na projekt.");
     // Validate before creating files; no archive paths are ever used as storage keys.
     for (const f of entries) {
@@ -160,9 +169,9 @@ export async function importZip(
           sourcePath = gradedOnly
             ? f.name.replace(/_graded\.pdf$/i, ".pdf")
             : f.name,
-          meta = parseSubmission(sourcePath)!,
-          pdfBytes = await f.async("uint8array");
+          meta = parseSubmission(sourcePath)!;
         try {
+          const pdfBytes = await f.async("uint8array");
           const known = existingDocuments.get(meta.submissionId);
           // Existing records already have their original PDF stored. Sending it
           // again wastes bandwidth and may return before the body finishes.
@@ -191,7 +200,15 @@ export async function importZip(
               );
               continue;
             }
-            const decision = mergeDecision(d.state, incoming);
+            let decision = mergeDecision(d.state, incoming);
+            if (decision === "keep") {
+              const stored = await fetch(`/api/${root}/documents/${d.id}/file`);
+              if (!stored.ok) throw new Error("PDF sa nepodarilo načítať.");
+              if (
+                !sameBytes(new Uint8Array(await stored.arrayBuffer()), pdfBytes)
+              )
+                decision = "conflict";
+            }
             if (decision === "conflict")
               conflicts.push({
                 projectId: pid,
@@ -200,18 +217,19 @@ export async function importZip(
                 metadata: meta,
                 first: d.state,
                 second: incoming,
+                incomingPdf: pdfBytes,
                 revision: d.revision,
                 choice: "",
               });
             if (decision === "replace") {
               try {
-                await api(root + "/documents/" + d.id, {
-                  method: "PATCH",
-                  body: JSON.stringify({
-                    state: incoming,
-                    revision: d.revision,
-                  }),
-                });
+                await writeImportedVersion(
+                  pid,
+                  d.id,
+                  incoming,
+                  d.revision,
+                  pdfBytes,
+                );
               } catch (e: any) {
                 if (e.status !== 409) throw e;
                 const latest = await api(root);
@@ -223,6 +241,7 @@ export async function importZip(
                   metadata: meta,
                   first: now.state,
                   second: incoming,
+                  incomingPdf: pdfBytes,
                   revision: now.revision,
                   choice: "",
                 });

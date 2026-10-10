@@ -105,6 +105,7 @@ export default function MergeDialog({
                     state={c[version]}
                     project={c.projectId}
                     id={c.id}
+                    pdf={version === "second" ? c.incomingPdf : undefined}
                   />
                 </label>
               ))}

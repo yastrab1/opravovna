@@ -65,3 +65,35 @@ assert.deepEqual(first.tags, ["a"], "Merge does not mutate inputs");
 console.log(
   "PASS: disjoint 1–10 / 20–40 export merge, empty-record protection, duplicate detection, first/second conflict choices and legacy metadata preservation",
 );
+
+const { sameGradedSubmission } = await import("../lib/import/equivalence.ts");
+const previousFetch = globalThis.fetch;
+globalThis.fetch = async () => new Response(new Uint8Array([1, 2, 3]));
+try {
+  const plain = normalizedState({ scoring: { points: 4.67 } });
+  assert.equal(
+    await sameGradedSubmission(
+      "project",
+      { id: "doc", state: plain },
+      structuredClone(plain),
+      new Uint8Array([1, 2, 3]),
+    ),
+    true,
+  );
+  const drawn = {
+    ...plain,
+    changes: [{ page: 0, type: "Path", data: { path: "M 0 0 L 10 10" } }],
+  };
+  assert.equal(
+    await sameGradedSubmission(
+      "project",
+      { id: "doc", state: plain },
+      drawn,
+      new Uint8Array([1, 2, 3]),
+    ),
+    false,
+    "Same original bytes cannot hide new annotations",
+  );
+} finally {
+  globalThis.fetch = previousFetch;
+}

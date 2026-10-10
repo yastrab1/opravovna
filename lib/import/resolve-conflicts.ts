@@ -1,3 +1,4 @@
+import { writeImportedVersion } from "./write-version";
 import { api } from "../client-api";
 export async function resolveMerge({
   mergeConflicts,
@@ -28,13 +29,13 @@ export async function resolveMerge({
         continue;
       }
       try {
-        await api(`projects/${pid}/documents/${conflict.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            state: conflict.second,
-            revision: conflict.revision,
-          }),
-        });
+        await writeImportedVersion(
+          pid,
+          conflict.id,
+          conflict.second,
+          conflict.revision,
+          conflict.incomingPdf,
+        );
         setMergeConflicts((old) => old.filter((x) => x.id !== conflict.id));
       } catch (e: any) {
         if (e.status === 409) {

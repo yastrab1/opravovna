@@ -4,10 +4,12 @@ export default function VersionSummary({
   state,
   project,
   id,
+  pdf,
 }: {
   state: any;
   project: string;
   id: string;
+  pdf?: Uint8Array;
 }) {
   const changes = state.changes ?? [];
   const texts = changes
@@ -38,7 +40,7 @@ export default function VersionSummary({
       ) : (
         <p className="muted">Bez textového komentára</p>
       )}
-      <SnapshotPreview state={state} project={project} id={id} />
+      <SnapshotPreview state={state} project={project} id={id} pdf={pdf} />
     </div>
   );
 }
@@ -46,10 +48,12 @@ function SnapshotPreview({
   state,
   project,
   id,
+  pdf,
 }: {
   state: any;
   project: string;
   id: string;
+  pdf?: Uint8Array;
 }) {
   const [url, setUrl] = useState(""),
     [loading, setLoading] = useState(false),
@@ -70,15 +74,16 @@ function SnapshotPreview({
           setLoading(true);
           setFailure("");
           try {
-            const res = await fetch(
-              `/api/projects/${project}/documents/${id}/file`,
-            );
-            if (!res.ok) throw new Error("PDF sa nepodarilo načítať.");
+            let source = pdf;
+            if (!source) {
+              const res = await fetch(
+                `/api/projects/${project}/documents/${id}/file`,
+              );
+              if (!res.ok) throw new Error("PDF sa nepodarilo načítať.");
+              source = new Uint8Array(await res.arrayBuffer());
+            }
             const { flattenPdf } = await import("@/lib/pdf-engine");
-            const bytes = await flattenPdf(
-              new Uint8Array(await res.arrayBuffer()),
-              state,
-            );
+            const bytes = await flattenPdf(source, state);
             setUrl(
               URL.createObjectURL(
                 new Blob([bytes as any], { type: "application/pdf" }),
