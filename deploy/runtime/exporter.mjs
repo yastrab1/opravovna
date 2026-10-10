@@ -119,6 +119,19 @@ export function createExporter(getBucket, options = {}) {
     if (failure) throw failure;
     if (closing) throw new Error('Server sa reštartuje. Skúste export znova.');
     zip.file('changes.arn', pack(legacy)); zip.file('opravovna.json', JSON.stringify(sidecar));
+    const pointsFile = zip.file('/points.json') ?? zip.file('points.json') ?? zip.file('point.json');
+    let points = { criteria: {}, scores: {} };
+    if (pointsFile) {
+      try { const parsed = JSON.parse(await pointsFile.async('string')); if (parsed && typeof parsed === 'object') points = { ...points, ...parsed, scores: { ...(parsed.scores ?? {}) } }; } catch {}
+    }
+    for (const document of snapshot.documents) {
+      const { submissionId } = document.metadata, scoring = document.state.scoring ?? {};
+      if (scoring.points == null) { delete points.scores[submissionId]; continue; }
+      const previous = points.scores[submissionId] ?? {};
+      const comments = (document.state.changes ?? []).filter(change => change.type === 'Text' && change.data?.text && change.data?.name !== scoring.annotName).map(change => change.data.text);
+      points.scores[submissionId] = { ...previous, acceptedCriteria: scoring.acceptedCriteria ?? previous.acceptedCriteria ?? [], final: scoring.final ?? true, points: scoring.points, comments: scoring.comments ?? (comments.length ? [...comments, `${scoring.points}B`] : [`${scoring.points}B`]) };
+    }
+    zip.file('/points.json', JSON.stringify(points, null, 2));
     job.stage = 'packing';
     await fs.mkdir(directory, { recursive: true });
     await pipeline(zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true, compression: 'STORE' }, update => { job.percent = Math.round(update.percent); }), createWriteStream(job.file, { mode: 0o600 }));

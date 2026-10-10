@@ -46,9 +46,10 @@ export default function Workspace(){
    setBusy('Kontrolujem archív…');const JSZip=(await import('jszip')).default;const zip=await JSZip.loadAsync(file);const entries=Object.values(zip.files).filter(x=>!x.dir);let total=0;
    const pdfs=entries.filter(x=>parseSubmission(x.name));if(!pdfs.length)throw new Error('ZIP neobsahuje riešenia vo formáte p4-c8-meno-12345.pdf.');if(pdfs.length>2000)throw new Error('Najviac 2000 riešení na projekt.');
    // Validate before creating files; no archive paths are ever used as storage keys.
-   for(const f of entries){if(f.name.includes('..')||f.name.startsWith('/')||f.name.includes('\\'))throw new Error('Archív obsahuje neplatnú cestu.');total+=(f as any)._data?.uncompressedSize??0;}if(total>2*1024**3)throw new Error('Rozbalený archív je príliš veľký.');
+   for(const f of entries){if(f.name.includes('..')||(f.name.startsWith('/')&&f.name!=='/points.json')||f.name.includes('\\'))throw new Error('Archív obsahuje neplatnú cestu.');total+=(f as any)._data?.uncompressedSize??0;}if(total>2*1024**3)throw new Error('Rozbalený archív je príliš veľký.');
    if(project.folder&&pdfs.some(f=>parseSubmission(f.name)?.folder!==project.folder))throw new Error('Tento ZIP patrí do iného projektu. Vytvorte nový projekt.');
    const pid=project.id;const root='projects/'+pid;const conflicts:any[]=[];let incomingLegacy:any={};if(zip.file('changes.arn')){const {unpack}=await import('msgpackr');incomingLegacy=unpack(await zip.file('changes.arn')!.async('uint8array'));}
+   const pointsFile=zip.file('/points.json')??zip.file('points.json')??zip.file('point.json');let pointScores:any={};if(pointsFile){const parsed=JSON.parse(await pointsFile.async('string'));if(!parsed||typeof parsed!=='object'||!parsed.scores||typeof parsed.scores!=='object')throw new Error('Neplatný formát points.json.');pointScores=parsed.scores;incomingLegacy.changes??={};for(const [id,score] of Object.entries(pointScores)){if(!score||typeof score!=='object'||!Number.isFinite(Number((score as any).points)))continue;const old=incomingLegacy.changes[id]??{};incomingLegacy.changes[id]={...old,scoring:{...old.scoring,...score}};}}
    const up=await api(root+'/archive',{method:'POST'});uploadId=up.id;
    const chunk=8*1024*1024;for(let offset=0,n=1;offset<file.size;offset+=chunk,n++){setBusy(`Ukladám ZIP na server… ${Math.round(offset/file.size*100)} %`);await api(root+'/uploads/'+up.id+'?part='+n,{method:'PUT',body:file.slice(offset,offset+chunk)});}
    await api(root+'/uploads/'+up.id,{method:'POST'});uploadId=undefined;
@@ -60,7 +61,7 @@ export default function Workspace(){
     try{
      const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(f.name)},body:await f.async('uint8array') as any});
      const graded=zip.file(gradedFilePath(f.name))??zip.file(legacyGradedFilePath(f.name,meta.submissionId));if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
-     const incoming=normalizedState(sidecar.documents?.[f.name]??incomingLegacy.changes?.[meta.submissionId]);
+     const incoming=normalizedState(sidecar.documents?.[f.name]??incomingLegacy.changes?.[meta.submissionId]);if(incoming.scoring?.points==null&&pointScores[meta.submissionId])incoming.scoring={...incoming.scoring,...pointScores[meta.submissionId]};
      if(d.existing){const decision=mergeDecision(d.state,incoming);
       if(decision==='conflict')conflicts.push({projectId:pid,id:d.id,path:f.name,metadata:meta,first:d.state,second:incoming,revision:d.revision,choice:''});
       if(decision==='replace'){try{await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:d.revision})});}catch(e:any){if(e.status!==409)throw e;const latest=await api(root);const now=latest.documents.find((x:any)=>x.id===d.id);conflicts.push({projectId:pid,id:d.id,path:f.name,metadata:meta,first:now.state,second:incoming,revision:now.revision,choice:''});}}
@@ -113,7 +114,9 @@ export default function Workspace(){
     const gradedPath=gradedFilePath(d.path);zip.remove(legacyGradedFilePath(d.path,m.submissionId));zip.remove(gradedPath);
     if(changed){const out=await flattenPdf(originalBytes,d.state);zip.file(gradedPath,out);}
    }
-   const {pack}=await import('msgpackr');zip.file('changes.arn',pack(legacy));zip.file('opravovna.json',JSON.stringify(sidecar));setBusy('Balím archív…');download(await zip.generateAsync({type:'blob',compression:'STORE'}),exportName(fresh.folder?projectTitle(fresh.folder):fresh.title));
+   const pointsFile=zip.file('/points.json')??zip.file('points.json')??zip.file('point.json');let points:any={criteria:{},scores:{}};if(pointsFile){try{const old=JSON.parse(await pointsFile.async('string'));if(old&&typeof old==='object')points={...points,...old,scores:{...(old.scores??{})}};}catch{}}
+   for(const d of fresh.documents){const id=d.metadata.submissionId,s=d.state.scoring??{};if(s.points==null){delete points.scores[id];continue;}const comments=(d.state.changes??[]).filter((c:any)=>c.type==='Text'&&c.data?.text&&c.data?.name!==s.annotName).map((c:any)=>c.data.text);points.scores[id]={...(points.scores[id]??{}),acceptedCriteria:s.acceptedCriteria??[],final:s.final??true,points:s.points,comments:s.comments??(comments.length?[...comments,`${s.points}B`]:[`${s.points}B`])};}
+   const {pack}=await import('msgpackr');zip.file('changes.arn',pack(legacy));zip.file('opravovna.json',JSON.stringify(sidecar));zip.file('/points.json',JSON.stringify(points,null,2));setBusy('Balím archív…');download(await zip.generateAsync({type:'blob',compression:'STORE'}),exportName(fresh.folder?projectTitle(fresh.folder):fresh.title));
   }catch(e){report(e);}finally{setBusy('');}
  }
  async function openSharing(){setSharing(!sharing);if(!sharing){try{setMembers(await api(`projects/${project.id}/members`));setLink(project.share?location.origin+'/?join='+project.share:'');}catch(e){report(e);}}}
