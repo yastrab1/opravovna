@@ -1,5 +1,6 @@
+import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 // Browser-only modules are imported on demand, never while server-rendering.
-export async function pdfjs(){const p=await import('pdfjs-dist/legacy/build/pdf.mjs');p.GlobalWorkerOptions.workerSrc='/pdf.worker.min.mjs';return p;}
+export async function pdfjs(){const p=await import('pdfjs-dist/legacy/build/pdf.mjs');p.GlobalWorkerOptions.workerSrc=workerUrl;return p;}
 export function legacyToFabric(change:any){
  const d={...change.data};const t=change.type;
  d.type=({Text:'Textbox',Path:'Path',Image:'Image',Rect:'Rect',Circle:'Circle',Ellipse:'Ellipse',Line:'Line',Triangle:'Triangle',Group:'Group'} as any)[t]??t;

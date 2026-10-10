@@ -9,6 +9,7 @@ export default function PdfEditor({doc,projectId,readonly,onChange,onError,regis
  const canvas=useRef<any>(null),pdf=useRef<any>(null),state=useRef<any>(doc.state),callbacks=useRef({onChange,onError});callbacks.current={onChange,onError};
  const [page,setPage]=useState(0),[count,setCount]=useState(1),[size,setSize]=useState({width:595,height:842}),[tool,setTool]=useState('select'),[color,setColor]=useState('#cc2e80'),[font,setFont]=useState('Ubuntu'),[fontSize,setFontSize]=useState(20),[width,setWidth]=useState(3),[zoom,setZoom]=useState(1),[ready,setReady]=useState(false),[rotation,setRotation]=useState(0);
  const mode=useRef({tool,color,font,fontSize,width});mode.current={tool,color,font,fontSize,width};
+ const initialFit=useRef(true);
  const history=useRef<any[]>([]),future=useRef<any[]>([]),loading=useRef(false),currentPage=useRef(0);
  function emit(next:any,remember=true){if(blocked.current||loading.current)return;if(remember){history.current.push(structuredClone(state.current));future.current=[];}state.current=next;callbacks.current.onChange(next);}
  function capture(){if(!canvas.current||loading.current)return;const changes=canvas.current.getObjects().map((o:any)=>fabricToLegacy(o,currentPage.current));emit({...state.current,changes:[...state.current.changes.filter((x:any)=>x.page!==currentPage.current),...changes]});}
@@ -22,12 +23,12 @@ export default function PdfEditor({doc,projectId,readonly,onChange,onError,regis
   emit({...state.current,changes:[...state.current.changes.filter((x:any)=>x.page!==currentPage.current&&x.data?.name!==prior),...changes],scoring:{...state.current.scoring,points,final:true,annotName:name,acceptedCriteria:state.current.scoring?.acceptedCriteria??[]}});
  }
  register({stamp,undo,redo});
- useEffect(()=>{let canceled=false;setPage(0);setReady(false);state.current=doc.state;history.current=[];future.current=[];
+ useEffect(()=>{let canceled=false;setPage(0);setReady(false);initialFit.current=true;state.current=doc.state;history.current=[];future.current=[];
   (async()=>{const res=await fetch(`/api/projects/${projectId}/documents/${doc.id}/file`);if(!res.ok)throw new Error('PDF sa nepodarilo načítať.');const js=await pdfjs();const loaded=await js.getDocument({data:new Uint8Array(await res.arrayBuffer())}).promise;if(canceled){loaded.destroy();return;}pdf.current=loaded;setCount(loaded.numPages+(state.current.extraPages??0));setReady(true);})().catch(e=>callbacks.current.onError(e.message));
   return()=>{canceled=true;pdf.current?.destroy();pdf.current=null;};
  },[doc.id,projectId]);
  useEffect(()=>{if(!ready)return;let canceled=false;let own:any;currentPage.current=page;loading.current=true;
-  (async()=>{await document.fonts.ready;const f=await import('fabric');const viewport=page<pdf.current.numPages?(await pdf.current.getPage(page+1)).getViewport({scale:1}):{width:595.28,height:841.89};if(canceled)return;setSize(viewport);setRotation(state.current.rotations?.[page]??0);
+  (async()=>{await document.fonts.ready;const f=await import('fabric');const viewport=page<pdf.current.numPages?(await pdf.current.getPage(page+1)).getViewport({scale:1}):{width:595.28,height:841.89};if(canceled)return;setSize(viewport);if(initialFit.current&&stage.current){setZoom(Math.min(1.4,Math.max(.4,(stage.current.clientWidth-56)/viewport.width)));initialFit.current=false;}setRotation(state.current.rotations?.[page]??0);
    const bg=pdfCanvas.current!;bg.width=viewport.width*2;bg.height=viewport.height*2;const ctx=bg.getContext('2d')!;ctx.fillStyle='#fefefe';ctx.fillRect(0,0,bg.width,bg.height);
    if(page<pdf.current.numPages)await (await pdf.current.getPage(page+1)).render({canvasContext:ctx,viewport,transform:[2,0,0,2,0,0]}).promise;if(canceled)return;
    own=new f.Canvas(annotationCanvas.current!,{width:viewport.width,height:viewport.height,selection:!readonly,enableRetinaScaling:true});canvas.current=own;await loadObjects(own,state.current.changes??[],page);if(canceled)return;own.getObjects().forEach((o:any)=>o.set({selectable:!readonly,evented:!readonly}));own.renderAll();loading.current=false;

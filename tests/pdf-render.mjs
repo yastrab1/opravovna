@@ -6,7 +6,7 @@ proto.getContext=function(type){const impl=implForWrapper(this);let c=impl._canv
 proto.toDataURL=function(...args){this.getContext('2d');return implForWrapper(this)._canvas.toDataURL(...args);};
 for(const [i,family] of [[0,'Gloria Hallelujah'],[1,'Open Sans'],[3,'Ubuntu'],[4,'Ubuntu'],[5,'Ubuntu']])GlobalFonts.registerFromPath(path.resolve(`public/fonts/font-${i}.ttf`),family);
 globalThis.document=env.document;globalThis.window=env.window;
-let source=await fs.readFile('lib/pdf-engine.ts','utf8');source=source.replaceAll("import('fabric')","import('fabric/node')").replace("'/pdf.worker.min.mjs'",JSON.stringify(path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs')));
+let source=await fs.readFile('lib/pdf-engine.ts','utf8');source=source.replace("import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';",`const workerUrl=${JSON.stringify(path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs'))};`);source=source.replaceAll("import('fabric')","import('fabric/node')").replace("'/pdf.worker.min.mjs'",JSON.stringify(path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs')));
 await fs.writeFile('.test-tmp/pdf-engine.mjs',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 const {flattenPdf,loadObjects,fabricToLegacy}=await import('../.test-tmp/pdf-engine.mjs');
 const zip=await JSZip.loadAsync(await fs.readFile('../4. Kto druhemu jamu kope sam do nej spadne_opravene.zip'));const legacy=unpack(await zip.file('changes.arn').async('uint8array'));const filename=Object.keys(zip.files).find(x=>x.endsWith('-41572.pdf'));const state={...legacy.changes['41572'],rotations:{},extraPages:0};

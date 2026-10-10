@@ -29,7 +29,8 @@ Local D1/R2 data lives in ignored `.wrangler/state`. `.env.local`, `.dev.vars`, 
 6. Enter a numeric score (0–5, including decimals such as 4.67) and insert a score stamp on the current page. Assigning a new score replaces the previous score annotation. Imported scores retain their original precision.
 7. Changes save after one second and synchronize every five seconds. A stale revision is rejected; download the unsaved state before loading the server version after a conflict. This is shared persistence with conflict detection, not simultaneous character-level co-editing.
 8. Share from the modal. Add verified Clerk email addresses as editors or viewers. Alternatively generate a revocable join link, granting editor access to anyone signed in with that link. Revoking a link prevents future joins; remove existing members separately. No invitation emails are sent.
-9. Export a corrected ZIP. PDF processing runs on the client, leaving the original pages intact and painting high-resolution annotations onto the separate graded PDF.
+9. Import further corrected exports into the same project to merge work. Incoming empty records keep existing edits; incoming edits replace empty records; differing edits on both sides open a conflict modal. Compare scores, comments, tags, annotation counts or generate PDF previews, then pick the first (existing) or second (incoming) version for each solution. You can choose the same side for all conflicts. Export stays disabled until conflicts are resolved. If you postpone resolution, the notice reopens the dialog; a page reload requires re-importing the ZIP to reconstruct unresolved choices.
+10. Export a corrected ZIP. PDF processing runs on the client, leaving the original pages intact and painting high-resolution annotations onto the separate graded PDF.
 
 ## Archive contract
 
@@ -56,12 +57,13 @@ Tests use mocked verified identities against real local Miniflare D1 and R2 bind
 
 ```sh
 node --experimental-strip-types tests/api.mjs
+node --experimental-strip-types tests/merge.mjs
 node tests/pdf-render.mjs
 npx tsc --noEmit
 npm run build
 ```
 
-Tests reference the supplied ZIPs one directory above this checkout. They cover permissions, viewer restrictions, join/revoke, upload ownership, multipart persistence, decimal scores, stale revision rejection, filename metadata, exact export naming, MessagePack roundtrip and PDF flattening. The renderer hydrates legacy annotations, preserves annotation IDs, checks appended pages/rotation and generates scratch PDFs/PNGs under `.test-tmp/pdf/` for visual inspection. It uses a native static canvas, not an automated browser. Browser end-to-end interaction has not been verified because the session's browser-control service is unavailable.
+Tests reference the supplied ZIPs one directory above this checkout. They cover permissions, viewer restrictions, join/revoke, upload ownership, multipart persistence, decimal scores, stale revision rejection, filename metadata, exact export naming, MessagePack roundtrip and PDF flattening, disjoint export merging and conflicting first/second version decisions. The renderer hydrates legacy annotations, preserves annotation IDs, checks appended pages/rotation and generates scratch PDFs/PNGs under `.test-tmp/pdf/` for visual inspection. It uses a native static canvas, not an automated browser. Browser end-to-end interaction has not been verified because the session's browser-control service is unavailable.
 
 ## Deploy
 
@@ -75,3 +77,5 @@ npx clerk@latest deploy status
 ```
 
 For independent Cloudflare hosting, build and create your own Wrangler deployment config based on `dist/server/wrangler.json`: set your Worker name, real D1 database ID, R2 bucket, `migrations_dir`, and asset directory. Apply migrations to your remote database, configure `CLERK_SECRET_KEY` using Wrangler secrets, and build with your production `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`. Never put the secret key in vars, source control or client bundles. Use your own domain matching the Clerk production instance. Deploy with `wrangler deploy` after applying migrations.
+
+The dark charcoal/slate design follows the supplied editor reference, with cyan tools and active rows, warm orange scoring actions, and lazy PDF thumbnails. The local server explicitly serves static assets before invoking the framework Worker; the PDF.js worker is bundled as a versioned URL. This avoids the empty framework static-file marker response that originally prevented PDF loading.
