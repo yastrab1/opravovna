@@ -9,6 +9,18 @@ export function parseSubmission(path: string) {
 export function projectTitle(folder: string) {
  return folder.replace(/^(\d+)-/, '$1. ').replace(/-+/g,' ').trim();
 }
+// Keep the submitter's identifying PDF filename in the flattened copy so
+// software can match it back to the source, instead of seeing only its ID.
+export function gradedFilePath(originalPath:string) {
+ const parts=originalPath.split('/'),basename=parts.pop()!;
+ const folder=parts.length?parts.join('/')+'/':'';
+ const stem=basename.replace(/\.pdf$/i,'');
+ return `${folder}${stem}_graded.pdf`;
+}
+export function legacyGradedFilePath(originalPath:string,submissionId:string) {
+ const folder=originalPath.includes('/')?originalPath.slice(0,originalPath.lastIndexOf('/')+1):'';
+ return `${folder}${submissionId}_graded.pdf`;
+}
 export function exportName(title: string) {
  return title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[/\\:*?"<>|]/g,'').replace(/_opravene(?:\.zip)?$/i,'').trim() + '_opravene.zip';
 }

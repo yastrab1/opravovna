@@ -9,7 +9,7 @@ import {categoryLabel,compareCategories,readPreferences,type Preferences} from '
 import {mergeDecision,normalizedState} from '@/lib/merge';
 import { api,download } from '@/lib/client-api';
 import {tagName,collectTags} from '@/lib/tags';
-import { parseSubmission,exportName,projectTitle } from '@/lib/archive';
+import { parseSubmission,exportName,projectTitle,gradedFilePath,legacyGradedFilePath } from '@/lib/archive';
 const PdfEditor=dynamic(()=>import('./pdf-editor'),{ssr:false,loading:()=> <div className="loading">Pripravujem editor…</div>});
 export default function Workspace(){
  const {isLoaded,isSignedIn,user}=useUser();const [projects,setProjects]=useState<any[]>([]),[project,setProject]=useState<any>(null),[active,setActive]=useState<string|null>(null),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[tagFilter,setTagFilter]=useState(''),[newTitle,setNewTitle]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState(''),[saveStatus,setSaveStatus]=useState('Uložené'),[sharing,setSharing]=useState(false),[members,setMembers]=useState<any[]>([]),[email,setEmail]=useState(''),[memberRole,setMemberRole]=useState('editor'),[link,setLink]=useState(''),[tag,setTag]=useState(''),[mergeConflicts,setMergeConflicts]=useState<any[]>([]),[mergeOpen,setMergeOpen]=useState(false);
@@ -59,7 +59,7 @@ export default function Workspace(){
     const f=pdfs[i],meta=parseSubmission(f.name)!;
     try{
      const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(f.name)},body:await f.async('uint8array') as any});
-     const graded=zip.file((meta.folder?meta.folder+'/':'')+meta.submissionId+'_graded.pdf');if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
+     const graded=zip.file(gradedFilePath(f.name))??zip.file(legacyGradedFilePath(f.name,meta.submissionId));if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
      const incoming=normalizedState(sidecar.documents?.[f.name]??incomingLegacy.changes?.[meta.submissionId]);
      if(d.existing){const decision=mergeDecision(d.state,incoming);
       if(decision==='conflict')conflicts.push({projectId:pid,id:d.id,path:f.name,metadata:meta,first:d.state,second:incoming,revision:d.revision,choice:''});
@@ -110,7 +110,8 @@ export default function Workspace(){
     for(const t of d.state.tags)if(!legacy.tags.some((v:any)=>(typeof v==='object'?v.name:v)===(typeof t==='object'?t.name:t)))legacy.tags.push(t);
     const original=await fetch(`/api/projects/${pid}/documents/${d.id}/file`);if(!original.ok)throw new Error('Pôvodné PDF sa nepodarilo načítať.');const originalBytes=new Uint8Array(await original.arrayBuffer());zip.file(d.path,originalBytes);
     const changed=d.state.changes.length||d.state.extraPages||Object.keys(d.state.rotations??{}).length;
-    if(changed){const out=await flattenPdf(originalBytes,d.state);zip.file((m.folder?m.folder+'/':'')+m.submissionId+'_graded.pdf',out);}else zip.remove((m.folder?m.folder+'/':'')+m.submissionId+'_graded.pdf');
+    const gradedPath=gradedFilePath(d.path);zip.remove(legacyGradedFilePath(d.path,m.submissionId));zip.remove(gradedPath);
+    if(changed){const out=await flattenPdf(originalBytes,d.state);zip.file(gradedPath,out);}
    }
    const {pack}=await import('msgpackr');zip.file('changes.arn',pack(legacy));zip.file('opravovna.json',JSON.stringify(sidecar));setBusy('Balím archív…');download(await zip.generateAsync({type:'blob',compression:'STORE'}),exportName(fresh.folder?projectTitle(fresh.folder):fresh.title));
   }catch(e){report(e);}finally{setBusy('');}

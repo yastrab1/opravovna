@@ -8,7 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { pack } from 'msgpackr';
-import { exportName, projectTitle } from './dist/export/archive.mjs';
+import { exportName, projectTitle, gradedFilePath, legacyGradedFilePath } from './dist/export/archive.mjs';
 
 class RenderPool {
   constructor(size) { this.slots = Array.from({ length: size }, () => ({ worker: null, task: null })); this.queue = []; }
@@ -104,7 +104,10 @@ export function createExporter(getBucket, options = {}) {
           const bytes = new Uint8Array(await new Response(input.body).arrayBuffer());
           zip.file(document.path, bytes);
           const { metadata: m, state } = document;
-          const graded = (m.folder ? m.folder + '/' : '') + m.submissionId + '_graded.pdf';
+          const graded = gradedFilePath(document.path);
+          // Remove any old ID-only copy when replacing the flattened file.
+          zip.remove(legacyGradedFilePath(document.path, m.submissionId));
+          zip.remove(graded);
           const changed = state.changes?.length || state.extraPages || Object.values(state.rotations ?? {}).some(v => v !== 0);
           if (changed) zip.file(graded, await pool.run(bytes.slice(), state));
           else zip.remove(graded);

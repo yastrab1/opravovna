@@ -107,7 +107,10 @@ image together when rolling this authentication cutover back.
 The self-hosted runtime provides an internal `EXPORTER` binding. Protected API
 routes take a saved project snapshot, then a Node worker-thread pool renders the
 annotated PDFs with the same annotation conversion and PDF placement code as
-the browser editor. Original PDFs, MessagePack metadata, the Opravovna sidecar,
+the browser editor. Flattened PDFs use the original submission basename plus
+`_graded.pdf` so reviewers can match each annotation to its source by name.
+The importer also accepts older ID-only names such as `41608_graded.pdf`.
+Original PDFs, MessagePack metadata, the Opravovna sidecar,
 attachments and the `_opravene.zip` naming contract are preserved. Native Skia
 renders embedded images and bundled fonts; annotation images cannot fetch URLs
 from the server. Pages without annotations skip canvas rendering.
