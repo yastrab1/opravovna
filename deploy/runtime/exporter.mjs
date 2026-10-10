@@ -119,7 +119,7 @@ export function createExporter(getBucket, options = {}) {
     if (failure) throw failure;
     if (closing) throw new Error('Server sa reštartuje. Skúste export znova.');
     zip.file('changes.arn', pack(legacy)); zip.file('opravovna.json', JSON.stringify(sidecar));
-    const pointsFile = zip.file('/points.json') ?? zip.file('points.json') ?? zip.file('point.json');
+    const pointsFile = Object.values(zip.files).find(entry => !entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, '')));
     let points = { criteria: {}, scores: {} };
     if (pointsFile) {
       try { const parsed = JSON.parse(await pointsFile.async('string')); if (parsed && typeof parsed === 'object') points = { ...points, ...parsed, scores: { ...(parsed.scores ?? {}) } }; } catch {}
@@ -131,7 +131,9 @@ export function createExporter(getBucket, options = {}) {
       const comments = (document.state.changes ?? []).filter(change => change.type === 'Text' && change.data?.text && change.data?.name !== scoring.annotName).map(change => change.data.text);
       points.scores[submissionId] = { ...previous, acceptedCriteria: scoring.acceptedCriteria ?? previous.acceptedCriteria ?? [], final: scoring.final ?? true, points: scoring.points, comments: scoring.comments ?? (comments.length ? [...comments, `${scoring.points}B`] : [`${scoring.points}B`]) };
     }
-    zip.file('/points.json', JSON.stringify(points, null, 2));
+    for (const entry of Object.values(zip.files)) if (!entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, ''))) zip.remove(entry.name);
+    const pdfFolder = snapshot.documents[0]?.path.includes('/') ? snapshot.documents[0].path.slice(0, snapshot.documents[0].path.lastIndexOf('/')) : '';
+    zip.file(`${pdfFolder ? `${pdfFolder}/` : ''}points.json`, JSON.stringify(points, null, 2));
     job.stage = 'packing';
     await fs.mkdir(directory, { recursive: true });
     await pipeline(zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true, compression: 'STORE' }, update => { job.percent = Math.round(update.percent); }), createWriteStream(job.file, { mode: 0o600 }));
