@@ -1,6 +1,7 @@
 import { Miniflare, Log, LogLevel } from 'miniflare';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createExporter } from './exporter.mjs';
 
 const root = process.cwd();
 const state = process.env.DATA_DIR || '/data';
@@ -16,6 +17,7 @@ for (const key of ['CLERK_SECRET_KEY', 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY']) {
 
 // Run the compiled Worker directly: no dev watcher, CLI login or cloud storage.
 // Preserve Wrangler's binding IDs so an offline copy of its v3 state opens intact.
+const exporter = createExporter(() => mf.getR2Bucket('BUCKET'));
 const mf = new Miniflare({
   name: config.name,
   // Clerk and the framework use dynamic imports; register every built chunk.
@@ -28,6 +30,7 @@ const mf = new Miniflare({
   port: Number(process.env.PORT || 8787),
   cf: false,
   log: new Log(LogLevel.INFO),
+  serviceBindings: { EXPORTER: request => exporter.fetch(request) },
   bindings: {
     APP_ORIGIN: origin.origin,
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
@@ -61,6 +64,7 @@ try {
   // Health only becomes ready once migrations have succeeded.
   await db.prepare("CREATE TABLE IF NOT EXISTS opravovna_health (id INTEGER PRIMARY KEY)").run();
   console.log(`Opravovna listening on ${await mf.ready}; public origin ${origin.origin}`);
+  console.log(`Server export pool: ${exporter.threads} CPU threads`);
 } catch (error) {
   await mf.dispose();
   throw error;
@@ -70,6 +74,7 @@ let stopping = false;
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, async () => {
   if (stopping) return;
   stopping = true;
+  await exporter.close();
   await mf.dispose();
   process.exit(0);
 });

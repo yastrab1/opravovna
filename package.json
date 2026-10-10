@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "dev:hot": "node scripts/run-framework.mjs dev",
     "test": "node --experimental-strip-types tests/api.mjs && node --experimental-strip-types tests/merge.mjs && node tests/pdf-render.mjs",
+    "test:export": "node tests/export.mjs",
     "check": "tsc --noEmit"
   },
   "dependencies": {

@@ -9,6 +9,7 @@ services:
     environment:
       APP_ORIGIN: https://opravovna.tech
       DATA_DIR: /data
+      EXPORT_WORKERS: "12"
     volumes:
       - /home/r2d2/unified/data/opravovna:/data
     ports:

@@ -3,6 +3,19 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "miniflare": "4.20260515.0"
+    "miniflare": "4.20260515.0",
+    "@napi-rs/canvas": "1.0.10",
+    "canvas": "file:./canvas",
+    "fabric": "6.9.1",
+    "jsdom": "20.0.3",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "5.7.284",
+    "jszip": "3.10.1",
+    "msgpackr": "1.11.5"
+  },
+  "overrides": {
+    "fabric": {
+      "canvas": "$canvas"
+    }
   }
 }

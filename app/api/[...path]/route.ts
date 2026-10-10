@@ -4,7 +4,7 @@ import { parseSubmission, projectTitle } from '@/lib/archive';
 import { unpack } from 'msgpackr';
 import { mergeLegacy } from '@/lib/merge';
 export const dynamic = 'force-dynamic';
-const E = () => env as unknown as { DB: D1Database; BUCKET: R2Bucket };
+const E = () => env as unknown as { DB: D1Database; BUCKET: R2Bucket; EXPORTER?: Fetcher };
 const json = (x: unknown, status=200) => Response.json(x,{status,headers:{'Cache-Control':'no-store'}});
 function fail(message: string,status=400): never { throw Object.assign(new Error(message),{status}); }
 const id=()=>crypto.randomUUID();
@@ -30,7 +30,19 @@ async function handle(req:Request) {
  const project=await DB.prepare('SELECT * FROM projects WHERE id=?').bind(p[1]).first<any>();if(!project)fail('Projekt neexistuje.',404);
  const membership=await DB.prepare('SELECT role FROM members WHERE project=? AND email=?').bind(project.id,email).first<any>();
  const role=project.owner===u.userId?'owner':membership?.role;if(!role)fail('Nemáte prístup k projektu.',403);
- if(req.method!=='GET'&&role==='viewer')fail('Projekt je iba na čítanie.',403);
+ if(req.method!=='GET'&&role==='viewer'&&!(p[2]==='export'&&req.method==='POST'))fail('Projekt je iba na čítanie.',403);
+ if(p[2]==='export'){
+  const exporter=E().EXPORTER;
+  if(!exporter)return json({error:'Serverový export nie je dostupný.'},501);
+  const headers={'x-export-owner':u.userId,'x-export-project':project.id};
+  const dispatch=async(request:Request)=>{const response=await exporter.fetch(request);const forwarded=new Response(response.body,response);forwarded.headers.set('Cache-Control','private, no-store');return forwarded;};
+  if(req.method==='POST'&&!p[3]){
+   const documents=(await DB.prepare('SELECT path,original,metadata,state,revision FROM documents WHERE project=? ORDER BY path').bind(project.id).all()).results.map((d:any)=>({...d,metadata:JSON.parse(d.metadata),state:JSON.parse(d.state)}));
+   return dispatch(new Request('http://export.internal/create',{method:'POST',headers,body:JSON.stringify({project:{id:project.id,title:project.title,folder:project.folder,archive:project.archive,legacy:JSON.parse(project.legacy)},documents})}));
+  }
+  if(req.method==='GET'&&p[3]&&p.length<6&&(!p[4]||p[4]==='download'))return dispatch(new Request('http://export.internal/jobs/'+encodeURIComponent(p[3])+(p[4]?'/download':''),{headers}));
+  fail('Nepovolená metóda.',405);
+ }
  if(!p[2]){
   if(req.method==='GET')return json({...project,role,legacy:JSON.parse(project.legacy),share:role==='owner'?project.share:undefined,documents:(await DB.prepare('SELECT id,path,metadata,state,revision,updated,graded FROM documents WHERE project=? ORDER BY path').bind(project.id).all()).results.map((d:any)=>({...d,metadata:JSON.parse(d.metadata),state:JSON.parse(d.state),graded:!!d.graded}))});
   if(req.method==='PATCH'){const b=await body(req);if(role!=='owner')fail('Iba vlastník môže meniť projekt.',403);if(!b.title?.trim()||b.title.length>200)fail('Neplatný názov.');await DB.prepare('UPDATE projects SET title=? WHERE id=?').bind(b.title.trim(),project.id).run();return json({ok:true});}
@@ -81,7 +93,20 @@ async function handle(req:Request) {
   if(p[4]==='graded'&&req.method==='PUT'){const bytes=await req.arrayBuffer();if(bytes.byteLength>50*1024*1024||new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')fail('Neplatný PDF súbor.');const key=`${project.id}/documents/${doc.id}/graded.pdf`;await BUCKET.put(key,bytes);await DB.prepare('UPDATE documents SET graded=? WHERE id=?').bind(key,doc.id).run();return json({ok:true});}
   if(req.method==='PATCH'){
    const b=await body(req);if(!b.state||!Array.isArray(b.state.changes)||!Array.isArray(b.state.tags)||!Number.isInteger(b.revision))fail('Neplatné údaje.');const points=b.state.scoring?.points;if(points!=null&&(typeof points!=='number'||!Number.isFinite(points)||points<0||points>5)&&points!==JSON.parse(doc.state).scoring?.points)fail('Body musia byť číslo od 0 do 5.');
-   const out=await DB.prepare('UPDATE documents SET state=?, revision=revision+1, updated=? WHERE id=? AND revision=?').bind(JSON.stringify(b.state),Date.now(),doc.id,b.revision).run();
+   for(const tag of b.state.tags){const name=typeof tag==='string'?tag:tag?.name;if(typeof name!=='string'||!name.trim()||name.length>60)fail('Štítok musí mať názov do 60 znakov.');}
+   if(b.state.tags.length>100)fail('Riešenie môže mať najviac 100 štítkov.');
+   const state=JSON.stringify(b.state);
+   const catalogTags=[...(JSON.parse(doc.state).tags??[]),...b.state.tags].filter((tag:any)=>typeof tag==='string'||typeof tag?.name==='string');
+   const [out]=await DB.batch([
+    DB.prepare('UPDATE documents SET state=?, revision=revision+1, updated=? WHERE id=? AND revision=?').bind(state,Date.now(),doc.id,b.revision),
+    // Persist the project vocabulary even when the last assignment is removed.
+    // JSON append runs atomically with the revision update, so reviewers cannot
+    // overwrite each other's tags or add tags through a stale document save.
+    ...catalogTags.map((tag:any)=>DB.prepare(`UPDATE projects SET legacy=json_set(legacy,'$.tags',json_insert(COALESCE(json_extract(legacy,'$.tags'),'[]'),'$[#]',json(?)))
+     WHERE id=? AND EXISTS(SELECT 1 FROM documents WHERE id=? AND revision=? AND state=?)
+     AND NOT EXISTS(SELECT 1 FROM json_each(COALESCE(json_extract(projects.legacy,'$.tags'),'[]')) t WHERE CASE WHEN t.type='object' THEN json_extract(t.value,'$.name') ELSE t.value END=?)`)
+     .bind(JSON.stringify(tag),project.id,doc.id,b.revision+1,state,typeof tag==='string'?tag:tag.name)),
+   ]);
    if(!out.meta.changes)return json({error:'Dokument medzitým upravil iný používateľ. Vaše zmeny ostali otvorené.',conflict:true},409);
    return json({revision:b.revision+1});
   }

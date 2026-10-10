@@ -101,3 +101,36 @@ The server retains the private map in `secrets/opravovna-account-map.json` and a
 pre-cutover database, environment and Compose snapshot under
 `backups/opravovna/before-clerk-production-*`. Restore the database, keys and
 image together when rolling this authentication cutover back.
+
+## Parallel server exports
+
+The self-hosted runtime provides an internal `EXPORTER` binding. Protected API
+routes take a saved project snapshot, then a Node worker-thread pool renders the
+annotated PDFs with the same annotation conversion and PDF placement code as
+the browser editor. Original PDFs, MessagePack metadata, the Opravovna sidecar,
+attachments and the `_opravene.zip` naming contract are preserved. Native Skia
+renders embedded images and bundled fonts; annotation images cannot fetch URLs
+from the server. Pages without annotations skip canvas rendering.
+
+Set `EXPORT_WORKERS` to tune parallelism (1–16). The r2d2 Compose configuration
+uses 12 threads. One archive generates at a time, with up to three more queued,
+so simultaneous users cannot multiply the thread pool and memory usage. R2
+files are consumed as streams rather than through large proxy RPC results.
+The browser polls progress, then downloads the finished ZIP. Generation does
+not depend on an open browser connection. Identical snapshots reuse a finished
+archive for 30 minutes, and the most recent eight finished jobs are retained.
+Job status and downloads require both the creating account and current project
+access. Temporary archives are deleted on expiration or process restart;
+database and PDF storage are unchanged. Hosts without the binding retain the
+browser export fallback.
+
+`npm run test:export` checks threaded export, the interchange schema, original
+bytes, decimal grades, rotation, extra pages, image rendering, job isolation,
+cached retries and rejection of remote image URLs. It requires Poppler's
+`pdftoppm` for an actual rendered-image assertion. `tests/container-auth.mjs`
+checks real-session authentication separately.
+
+Project tag names are retained in the existing `legacy.tags` vocabulary when a
+document is saved. SQLite appends missing tags in the same transaction as the
+document revision update, preserving concurrent reviewer changes. Removing an
+assignment keeps the project tag available for other solutions and exports.
