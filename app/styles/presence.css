@@ -1,0 +1,65 @@
+.project-presence {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.presence-person {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+}
+.presence-person img {
+  border-radius: 50%;
+  object-fit: cover;
+}
+.presence-initials {
+  text-transform: uppercase;
+}
+.presence-person:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.presence-tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: min(270px, 75vw);
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 12px oklch(10% 0.01 250 / 0.3);
+}
+.presence-person:hover .presence-tooltip,
+.presence-person:focus .presence-tooltip {
+  display: block;
+}
+@media (max-width: 620px) {
+  .project-presence {
+    gap: 2px;
+  }
+  .presence-person {
+    width: 24px;
+    height: 24px;
+  }
+  .presence-person img {
+    width: 22px;
+    height: 22px;
+  }
+}

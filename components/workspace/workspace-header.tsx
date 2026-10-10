@@ -1,13 +1,16 @@
 "use client";
+import ProjectViewers from "./project-viewers";
 import ToolSettings from "@/app/tool-settings";
 import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { PencilMark } from "./icons";
 export default function WorkspaceHeader({
+  projectId,
   isSignedIn,
   preferences,
   persistPreferences,
 }: {
+  projectId?: string;
   isSignedIn: boolean | undefined;
   preferences: any;
   persistPreferences: any;
@@ -24,6 +27,7 @@ export default function WorkspaceHeader({
         <span className="muted desktop">Priestor na dobrú spätnú väzbu</span>
         {isSignedIn ? (
           <>
+            <ProjectViewers projectId={projectId} />
             <ToolSettings
               tools={preferences.tools}
               onSave={(tools) => persistPreferences({ tools })}

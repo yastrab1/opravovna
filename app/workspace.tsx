@@ -95,6 +95,7 @@ export default function Workspace() {
         <ImportScoreDialog {...scoreCorrection} />
       )}
       <WorkspaceHeader
+        projectId={project?.id}
         isSignedIn={isSignedIn}
         preferences={preferences}
         persistPreferences={persistPreferences}

@@ -1,4 +1,10 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
   owner: text("owner").notNull(),
@@ -34,3 +40,20 @@ export const uploads = sqliteTable("uploads", {
   multipart: text("multipart").notNull(),
   parts: text("parts").notNull().default("[]"),
 });
+
+export const projectPresence = sqliteTable(
+  "project_presence",
+  {
+    project: text("project").notNull(),
+    user: text("user").notNull(),
+    session: text("session").notNull(),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    image: text("image").notNull(),
+    updated: integer("updated").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.project, table.user, table.session] }),
+    index("presence_updated_idx").on(table.updated),
+  ],
+);

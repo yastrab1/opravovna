@@ -13,7 +13,7 @@ export async function createApiFixture() {
   );
   try {
     await fs.mkdir(".test-tmp/server", { recursive: true });
-    for (const name of ["archive", "merge"])
+    for (const name of ["archive", "merge", "presence"])
       await fs.writeFile(
         `.test-tmp/${name}.mjs`,
         ts.transpileModule(await fs.readFile(`lib/${name}.ts`, "utf8"), {

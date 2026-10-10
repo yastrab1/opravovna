@@ -1,3 +1,4 @@
+import { handlePresence } from "@/lib/server/presence";
 import { handleDocuments } from "@/lib/server/documents";
 import { handleExports } from "@/lib/server/exports";
 import { body, fail, id, json, type ApiContext } from "@/lib/server/http";
@@ -90,7 +91,8 @@ async function handle(req: Request) {
     if (
       req.method !== "GET" &&
       role === "viewer" &&
-      !(p[2] === "export" && req.method === "POST")
+      !(p[2] === "export" && req.method === "POST") &&
+      p[2] !== "presence"
     )
       fail("Projekt je iba na čítanie.", 403);
 
@@ -107,6 +109,7 @@ async function handle(req: Request) {
       exporter: E().EXPORTER,
     };
     for (const handler of [
+      handlePresence,
       handleExports,
       handleSharing,
       handleUploads,
