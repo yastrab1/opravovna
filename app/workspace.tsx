@@ -225,8 +225,6 @@ export default function Workspace() {
               documents={documents}
               active={active}
               switchDoc={switchDoc}
-              nextDocument={nextDocument}
-              openNext={openNext}
             />
             {doc ? (
               <>
@@ -247,6 +245,8 @@ export default function Workspace() {
                   readonly={readonly}
                   busy={busy}
                   applyGrade={applyGrade}
+                  nextDocument={nextDocument}
+                  openNext={openNext}
                   editor={editor}
                   projectTags={projectTags}
                   toggleTag={toggleTag}

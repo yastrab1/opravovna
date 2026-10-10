@@ -167,9 +167,10 @@ export function useWorkspace() {
   const activeIndex = navigationDocuments.findIndex(
     (d: any) => d.id === active,
   );
-  const nextDocument = navigationDocuments
-    .slice(Math.max(0, activeIndex + 1))
-    .find((d: any) => documents.some((visible: any) => visible.id === d.id));
+  const nextDocument = [
+    ...navigationDocuments.slice(activeIndex + 1),
+    ...navigationDocuments.slice(0, Math.max(0, activeIndex)),
+  ].find((d: any) => d.id !== active && d.state.scoring?.points == null);
   async function openNext() {
     if (nextDocument) await switchDoc(nextDocument.id);
   }

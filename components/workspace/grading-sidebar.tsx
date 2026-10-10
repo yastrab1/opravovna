@@ -1,7 +1,7 @@
 "use client";
 import { categoryLabel } from "@/lib/preferences";
 import { tagName } from "@/lib/tags";
-import { Check, Plus, ShieldCheck, Tag, X } from "lucide-react";
+import { Check, ChevronRight, Plus, ShieldCheck, Tag, X } from "lucide-react";
 import { useEffect, useState } from "react";
 export default function GradingSidebar({
   doc,
@@ -14,6 +14,8 @@ export default function GradingSidebar({
   tag,
   setTag,
   changed,
+  nextDocument,
+  openNext,
 }: {
   doc: any;
   readonly: boolean;
@@ -25,6 +27,8 @@ export default function GradingSidebar({
   tag: string;
   setTag: any;
   changed: any;
+  nextDocument: any;
+  openNext: () => Promise<void>;
 }) {
   return (
     <aside className="grading">
@@ -44,6 +48,19 @@ export default function GradingSidebar({
           <dd>{doc.metadata.submissionId}</dd>
         </div>
       </dl>
+      <button
+        type="button"
+        className="nextsolution"
+        onClick={openNext}
+        disabled={!!busy || !nextDocument}
+        title={
+          nextDocument
+            ? `Otvoriť: ${nextDocument.metadata.name}`
+            : "Žiadne ďalšie neohodnotené riešenie vo vybraných kategóriách a filtroch"
+        }
+      >
+        Ďalšie neohodnotené <ChevronRight size={16} />
+      </button>
       <div className="gradesection">
         <h3>Body</h3>
         <ScoreInput

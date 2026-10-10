@@ -2,7 +2,7 @@
 import Thumbnail from "@/app/thumbnail";
 import { categoryLabel } from "@/lib/preferences";
 import { tagName } from "@/lib/tags";
-import { Check, ChevronRight, Search, Upload } from "lucide-react";
+import { Check, Search, Upload } from "lucide-react";
 export default function SubmissionsSidebar({
   project,
   readonly,
@@ -23,8 +23,6 @@ export default function SubmissionsSidebar({
   documents,
   active,
   switchDoc,
-  nextDocument,
-  openNext,
 }: {
   project: any;
   readonly: boolean;
@@ -45,8 +43,6 @@ export default function SubmissionsSidebar({
   documents: any[];
   active: any;
   switchDoc: any;
-  nextDocument: any;
-  openNext: any;
 }) {
   return (
     <aside className="submissions">
@@ -194,17 +190,6 @@ export default function SubmissionsSidebar({
           }{" "}
           / {project.documents.length} ohodnotených
         </span>
-        <button
-          onClick={openNext}
-          disabled={!!busy || !nextDocument}
-          title={
-            nextDocument
-              ? `Otvoriť: ${nextDocument.metadata.name}`
-              : "Ďalšie riešenie nie je k dispozícii"
-          }
-        >
-          Ďalšie <ChevronRight size={15} />
-        </button>
       </div>
     </aside>
   );
