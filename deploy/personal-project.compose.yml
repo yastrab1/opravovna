@@ -1,0 +1,50 @@
+services:
+  opravovna:
+    image: ${OPRAVOVNA_IMAGE:-ghcr.io/yastrab1/opravovna:test}
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"
+    env_file:
+      - /home/r2d2/unified/secrets/opravovna.env
+    environment:
+      APP_ORIGIN: https://opravovna.tech
+      DATA_DIR: /data
+    volumes:
+      - /home/r2d2/unified/data/opravovna:/data
+    ports:
+      - "127.0.0.1:8791:8787"
+    networks:
+      - opravovna
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  opravovna-tunnel:
+    image: cloudflare/cloudflared:2026.10.0
+    restart: unless-stopped
+    user: "1000:1000"
+    command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
+    depends_on:
+      opravovna:
+        condition: service_healthy
+    volumes:
+      - /home/r2d2/unified/secrets/opravovna-tunnel:/etc/cloudflared:ro
+    networks:
+      - opravovna
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+networks:
+  opravovna:

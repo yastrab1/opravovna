@@ -67,7 +67,9 @@ Tests reference the supplied ZIPs one directory above this checkout. They cover 
 
 ## Deploy
 
-Recommended: Cloudflare Workers + D1 + R2. They provide free usage allowances suitable for a small team, subject to current quotas and billing requirements. Clerk has a free plan with its own limits. PDF rasterization and ZIP work happen in the browser to keep server CPU requirements low.
+The current test runs in Docker on `r2d2`, behind Cloudflare Tunnel at https://opravovna.tech. Its services are in `/home/r2d2/unified/personal-project.compose.yml`, included in the unified app stack. The database and PDF/archive storage are persisted on the server. See [the Docker deployment guide](deploy/README.md) for updates, backups and runtime details.
+
+The earlier hosted Workers test exceeded the Free plan's CPU limit with this framework. It remains a separate test environment; the server deployment avoids that hosted CPU limit. PDF rasterization and ZIP work still happen in the browser.
 
 This checkout retains the Sites integration and `.openai/hosting.json` project identity for the private hosted version. Sites handles its D1/R2 provisioning and migrations. For a production Clerk instance, finish setup with your domain/DNS configuration:
 

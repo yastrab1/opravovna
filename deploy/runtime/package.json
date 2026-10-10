@@ -1,0 +1,8 @@
+{
+  "name": "opravovna-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "miniflare": "4.20260515.0"
+  }
+}
