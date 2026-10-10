@@ -74,6 +74,19 @@ container. Production Clerk API keys are runtime secrets; only the publishable
 key is supplied at image build time. Local development continues to use its
 separate development keys.
 
+The runtime image installs `ca-certificates`: workerd uses the OS trust store
+when fetching Clerk signing keys and user records. Node's built-in certificates
+alone are insufficient. Keep TLS certificate verification enabled.
+
+To check real authentication, run `node tests/container-auth.mjs` with
+`CLERK_SECRET_KEY`, an active `CLERK_TEST_SESSION_ID`, and `TEST_URL` supplied
+through a protected environment. This verifies cookie and bearer authentication,
+rejects anonymous/invalid sessions, and checks project request validation without
+creating data. Set `TEST_CREATE=1` only against an isolated localhost container
+with a disposable data copy to also verify project creation. Session tokens and
+account details are never printed. This optional check is separate from the
+regular API suite, which mocks identity.
+
 Clerk development sessions and user IDs do not carry over. A replacement
 production account was provisioned with the existing verified email, and its
 account preferences were copied. The application's project owners and upload

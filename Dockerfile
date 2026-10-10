@@ -12,6 +12,8 @@ RUN npm run build
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=8787
+# workerd uses the OS trust store for Clerk's HTTPS API and signing keys.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY deploy/runtime/package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && mkdir /data && chown node:node /data
 COPY --from=build /app/dist ./dist
