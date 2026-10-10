@@ -69,7 +69,7 @@ Tests reference the supplied ZIPs one directory above this checkout. They cover 
 
 Recommended: Cloudflare Workers + D1 + R2. They provide free usage allowances suitable for a small team, subject to current quotas and billing requirements. Clerk has a free plan with its own limits. PDF rasterization and ZIP work happen in the browser to keep server CPU requirements low.
 
-This checkout retains the Sites integration and `.openai/hosting.json` project identity for the private hosted version. Sites handles its D1/R2 provisioning and migrations. Production publication is pending Clerk's production setup, which requires your domain/DNS configuration:
+This checkout retains the Sites integration and `.openai/hosting.json` project identity for the private hosted version. Sites handles its D1/R2 provisioning and migrations. For a production Clerk instance, finish setup with your domain/DNS configuration:
 
 ```sh
 npx clerk@latest deploy
@@ -94,3 +94,5 @@ npx wrangler deploy --config wrangler.test.json
 ```
 
 Set Clerk runtime keys using Wrangler secrets (never commit their values). Rebuild after changes to the publishable key.
+
+First Cloudflare test: https://opravovna-test.opravovna-luki.workers.dev (development Clerk instance).
