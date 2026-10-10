@@ -1,0 +1,41 @@
+import fs from 'node:fs/promises';import assert from 'node:assert/strict';import ts from 'typescript';import {Miniflare} from 'miniflare';import JSZip from 'jszip';import {pack,unpack} from 'msgpackr';
+const mf=new Miniflare({modules:true,script:'export default {fetch(){return new Response("test")}}',compatibilityDate:'2026-05-15',d1Databases:['DB'],r2Buckets:['BUCKET']});
+try{
+ const DB=await mf.getD1Database('DB'),BUCKET=await mf.getR2Bucket('BUCKET');globalThis.__testEnv={DB,BUCKET};
+ for(const file of (await fs.readdir('drizzle')).filter(x=>x.endsWith('.sql')).sort())for(const sql of (await fs.readFile('drizzle/'+file,'utf8')).split('--> statement-breakpoint'))await DB.prepare(sql).run();
+ let source=await fs.readFile('app/api/[...path]/route.ts','utf8');source=source.replace("import { env } from 'cloudflare:workers';",'const env=globalThis.__testEnv;').replace("import { getUser } from '@/lib/auth';",'const getUser=async()=>globalThis.__testUser;').replace("'@/lib/archive'","'../lib/archive.ts'");
+ await fs.writeFile('.test-tmp/route.mjs',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);const route=await import('../.test-tmp/route.mjs');
+ const owner={userId:'owner',email:'owner@example.sk'},editor={userId:'editor',email:'editor@example.sk'},viewer={userId:'viewer',email:'viewer@example.sk'},outsider={userId:'outsider',email:'outside@example.sk'};
+ async function req(user,path,method='GET',body,headers={}){globalThis.__testUser=user;const r=await route[method](new Request('https://app.test/api/'+path,{method,headers,...(body!==undefined?{body:typeof body==='object'&&!(body instanceof Uint8Array)?JSON.stringify(body):body}:{})}));return {status:r.status,data:await r.json()};}
+ assert.equal((await req(null,'projects')).status,401);
+ let r=await req(owner,'projects','POST',{title:'4. Kto druhemu jamu kope sam do nej spadne'});assert.equal(r.status,200);const pid=r.data.id,base='projects/'+pid;
+ assert.equal((await req(outsider,base)).status,403);assert.equal((await req(owner,'projects')).data.length,1);
+ const input=await JSZip.loadAsync(await fs.readFile('../riesenia-666.zip'));const name='4-Kto-druhemu-jamu-kope--sam-do-nej-spadne/p4-c8-roger-goralka-41803.pdf';const bytes=await input.file(name).async('uint8array');
+ const legacy={tags:['skontrolovať'],scoringCriteria:[],changes:{'41803':{changes:[],tags:[],scoring:{points:4.75,final:true,acceptedCriteria:[]},opened:true,timeOpened:123}}};
+ assert.equal((await req(owner,base+'/legacy','PUT',pack(legacy))).status,200);
+ r=await req(owner,base+'/documents','POST',bytes,{'x-file-path':encodeURIComponent(name)});assert.equal(r.status,200);const did=r.data.id;
+ r=await req(owner,base);assert.equal(r.data.documents[0].metadata.name,'Roger Goralka');assert.equal(r.data.documents[0].metadata.rocnik,'8');assert.equal(r.data.documents[0].state.scoring.points,4.75);
+ const state={...r.data.documents[0].state,tags:['skontrolovať']};
+ assert.equal((await req(owner,base+'/documents/'+did,'PATCH',{state,revision:0})).status,200,'Imported fractional scores survive edits');
+ assert.equal((await req(owner,base+'/documents/'+did,'PATCH',{state,revision:0})).status,409,'Stale revisions must not overwrite');
+ assert.equal((await req(owner,base+'/documents/'+did,'PATCH',{state:{...state,scoring:{points:6}},revision:1})).status,400);
+ assert.equal((await req(owner,base+'/documents','POST',bytes,{'x-file-path':encodeURIComponent('../bad.pdf')})).status,400);
+ for(const u of [editor,viewer])assert.equal((await req(owner,base+'/members','POST',{email:u.email,role:u===viewer?'viewer':'editor'})).status,200);
+ assert.equal((await req(viewer,base)).status,200);assert.equal((await req(viewer,base+'/documents/'+did,'PATCH',{state,revision:1})).status,403);
+ assert.equal((await req(editor,base+'/members')).status,403);
+ assert.equal((await req(editor,base+'/documents/'+did,'PATCH',{state:{...state,scoring:{points:4.67}},revision:1})).status,200);
+ assert.equal((await req(owner,base,'PATCH',{title:'Unsafe'},{origin:'https://evil.test'})).status,403);
+ r=await req(owner,base+'/share','POST',{});const token=r.data.token;
+ assert.equal((await req(outsider,'join','POST',{token})).status,200);assert.equal((await req(outsider,base)).status,200);
+ await req(owner,base+'/share','POST',{revoke:true});assert.equal((await req({userId:'new',email:'new@example.sk'},'join','POST',{token})).status,404);
+ r=await req(owner,base+'/members');const m=r.data.find(x=>x.email===viewer.email);await req(owner,base+'/members','DELETE',{id:m.id});assert.equal((await req(viewer,base)).status,403);
+ const upload=(await req(owner,base+'/archive','POST')).data.id;
+ const tiny=new Uint8Array([80,75,3,4]);assert.equal((await req(outsider,base+'/uploads/'+upload+'?part=1','PUT',tiny)).status,404);
+ assert.equal((await req(owner,base+'/uploads/'+upload+'?part=1','PUT',tiny)).status,200);
+ assert.equal((await req(owner,base+'/uploads/'+upload,'POST',{})).status,200);
+ assert.deepEqual(new Uint8Array(await (await BUCKET.get((await DB.prepare('SELECT archive FROM projects WHERE id=?').bind(pid).first()).archive)).arrayBuffer()),tiny);
+ console.log('PASS: auth boundary, project isolation, metadata, legacy scores, revision conflicts, role permissions, invite revocation, upload ownership, R2 multipart persistence');
+ const corrected=await JSZip.loadAsync(await fs.readFile('../4. Kto druhemu jamu kope sam do nej spadne_opravene.zip'));const old=unpack(await corrected.file('changes.arn').async('uint8array'));assert.deepEqual(unpack(pack(old)),old);
+ const {parseSubmission,exportName}=await import('../lib/archive.ts');const originals=Object.keys(input.files).filter(x=>parseSubmission(x));assert.equal(originals.length,176);assert.equal(Object.keys(corrected.files).filter(x=>parseSubmission(x)).length,175);assert.equal(exportName('4. Kto druhému jamu kope sám do nej spadne'),'4. Kto druhemu jamu kope sam do nej spadne_opravene.zip');
+ console.log('PASS: 176 input submissions, 175 corrected originals, lossless MessagePack roundtrip, exact export filename');
+}finally{await mf.dispose();}
