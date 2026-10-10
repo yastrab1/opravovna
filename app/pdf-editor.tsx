@@ -1,81 +1,272 @@
-'use client';
-import { useEffect,useRef,useState } from 'react';
-import { MousePointer2,Type,Pencil,Highlighter,ImagePlus,ArrowUpRight,Square,Circle,RotateCw,FilePlus,Undo2,Redo2,Trash2,Bold,Italic,ChevronLeft,ChevronRight,ZoomIn,ZoomOut } from 'lucide-react';
-import {fonts,type Preferences,type ToolKey} from '@/lib/preferences';
-import { pdfjs,loadObjects,fabricToLegacy } from '@/lib/pdf-engine';
-import { largestImageBounds } from '@/lib/pdf-image';
-type Props={defaults:Preferences['tools'];doc:any;projectId:string;readonly:boolean;onChange:(state:any)=>void;onError:(s:string)=>void;register:(api:any)=>void};
-export default function PdfEditor({defaults,doc,projectId,readonly,onChange,onError,register}:Props){
- const stage=useRef<HTMLDivElement>(null),annotationCanvases=useRef<(HTMLCanvasElement|null)[]>([]),pdfCanvases=useRef<(HTMLCanvasElement|null)[]>([]),pageBounds=useRef<(HTMLDivElement|null)[]>([]);
- const blocked=useRef(readonly);blocked.current=readonly;
- const canvas=useRef<any>(null),pdf=useRef<any>(null),state=useRef<any>(doc.state),callbacks=useRef({onChange,onError});callbacks.current={onChange,onError};
- const [page,setPage]=useState(0),[count,setCount]=useState(1),[pageSizes,setPageSizes]=useState<{width:number;height:number}[]>([]),[tool,setTool]=useState('select'),[color,setColor]=useState(defaults.text.color),[font,setFont]=useState(defaults.text.font),[fontSize,setFontSize]=useState(defaults.text.fontSize),[width,setWidth]=useState(defaults.text.width),[zoom,setZoom]=useState(1),[ready,setReady]=useState(false),[rotation,setRotation]=useState(0);
- const [bold,setBold]=useState(defaults.text.bold),[italic,setItalic]=useState(defaults.text.italic);
- function applyDefaults(key:ToolKey){const value=defaults[key];setColor(value.color);setFont(value.font);setFontSize(value.fontSize);setWidth(value.width);setBold(value.bold);setItalic(value.italic);}
- function chooseTool(key:string){setTool(key);if(key!=='select')applyDefaults(key as ToolKey);}
- useEffect(()=>{applyDefaults(tool==='select'?'text':tool as ToolKey);},[defaults]);
- const mode=useRef({tool,color,font,fontSize,width,bold,italic});mode.current={tool,color,font,fontSize,width,bold,italic};
- const size=pageSizes[page]??{width:595.28,height:841.89};
- const rotationKey=JSON.stringify(doc.state.rotations??{});
- const initialFit=useRef(true);
- const history=useRef<any[]>([]),future=useRef<any[]>([]),loading=useRef(false),currentPage=useRef(0);
- function emit(next:any,remember=true){if(blocked.current||loading.current)return;if(remember){history.current.push(structuredClone(state.current));future.current=[];}state.current=next;callbacks.current.onChange(next);}
- function capture(){if(!canvas.current||loading.current)return;const changes=canvas.current.getObjects().map((o:any)=>fabricToLegacy(o,currentPage.current));emit({...state.current,changes:[...state.current.changes.filter((x:any)=>x.page!==currentPage.current),...changes]});}
- async function restore(next:any){if(!canvas.current)return;loading.current=true;canvas.current.clear();await loadObjects(canvas.current,next.changes,currentPage.current);canvas.current.renderAll();loading.current=false;state.current=next;setRotation(next.rotations?.[currentPage.current]??0);callbacks.current.onChange(next);const nextCount=(pdf.current?.numPages??1)+(next.extraPages??0);setCount(nextCount);setPageSizes(old=>old.slice(0,nextCount));}
- async function undo(){const next=history.current.pop();if(next){future.current.push(structuredClone(state.current));await restore(next);}}
- async function redo(){const next=future.current.pop();if(next){history.current.push(structuredClone(state.current));await restore(next);}}
- async function stamp(points:number){if(!canvas.current||blocked.current)return false;const f=await import('fabric');loading.current=true;
-  const prior=state.current.scoring?.annotName;canvas.current.getObjects().filter((o:any)=>o.name===prior||o.name?.startsWith('Score_')).forEach((o:any)=>canvas.current.remove(o));
-  const name='Text_'+crypto.randomUUID().slice(0,9);const text=new f.IText(points+'B',{left:Math.max(20,size.width-110),top:35,fontFamily:defaults.stamp.font,fontSize:defaults.stamp.fontSize,fill:defaults.stamp.color,fontWeight:defaults.stamp.bold?'bold':'normal',fontStyle:defaults.stamp.italic?'italic':'normal'});text.set({left:Math.max(15,size.width-text.width-25)});(text as any).name=name;canvas.current.add(text);canvas.current.setActiveObject(text);canvas.current.renderAll();loading.current=false;
-  const changes=canvas.current.getObjects().map((o:any)=>fabricToLegacy(o,currentPage.current));
-  emit({...state.current,changes:[...state.current.changes.filter((x:any)=>x.page!==currentPage.current&&x.data?.name!==prior),...changes],scoring:{...state.current.scoring,points,final:true,annotName:name,acceptedCriteria:state.current.scoring?.acceptedCriteria??[]}});return true;
- }
- function removeScore(){if(blocked.current||loading.current)return;const prior=state.current.scoring?.annotName;const isStamp=(o:any)=>Boolean(prior&&o.name===prior)||o.name?.startsWith('Score_');loading.current=true;canvas.current?.getObjects().filter(isStamp).forEach((o:any)=>canvas.current.remove(o));canvas.current?.discardActiveObject();canvas.current?.renderAll();loading.current=false;emit({...state.current,scoring:{},changes:state.current.changes.filter((x:any)=>!isStamp(x.data??{}))});}
- register({stamp,removeScore,undo,redo});
- useEffect(()=>{let canceled=false;setPage(0);setPageSizes([]);setReady(false);initialFit.current=true;state.current=doc.state;history.current=[];future.current=[];
-  (async()=>{const res=await fetch(`/api/projects/${projectId}/documents/${doc.id}/file`);if(!res.ok)throw new Error('PDF sa nepodarilo načítať.');const js=await pdfjs();const loaded=await js.getDocument({data:new Uint8Array(await res.arrayBuffer())}).promise;if(canceled){loaded.destroy();return;}pdf.current=loaded;const sizes=[];for(let i=0;i<loaded.numPages;i++){const p=await loaded.getPage(i+1);sizes.push(p.getViewport({scale:1}));}for(let i=0;i<(state.current.extraPages??0);i++)sizes.push({width:595.28,height:841.89});setPageSizes(sizes);setCount(sizes.length);setReady(true);})().catch(e=>callbacks.current.onError(e.message));
-  return()=>{canceled=true;pdf.current?.destroy();pdf.current=null;};
- },[doc.id,projectId]);
- useEffect(()=>{if(!ready||!pdf.current)return;let canceled=false;const tasks:any[]=[];(async()=>{const js=await pdfjs();for(let i=0;i<Math.min(pdf.current.numPages,pageSizes.length);i++){if(canceled)return;const page=await pdf.current.getPage(i+1),viewport=page.getViewport({scale:1}),bg=pdfCanvases.current[i];if(!bg)continue;bg.width=Math.round(viewport.width*2);bg.height=Math.round(viewport.height*2);const ctx=bg.getContext('2d')!;ctx.fillStyle='#fefefe';ctx.fillRect(0,0,bg.width,bg.height);const task=page.render({canvasContext:ctx,viewport,transform:[2,0,0,2,0,0]});tasks.push(task);await task.promise;const turn=((state.current.rotations?.[i]??0)%360+360)%360;if(!turn)continue;const bounds=await largestImageBounds(page,js);if(!bounds)continue;const crop=document.createElement('canvas');crop.width=Math.max(1,Math.round(bounds.width*2));crop.height=Math.max(1,Math.round(bounds.height*2));crop.getContext('2d')!.drawImage(bg,Math.round(bounds.left*2),Math.round(bounds.top*2),crop.width,crop.height,0,0,crop.width,crop.height);ctx.fillStyle='#fff';ctx.fillRect(bounds.left*2,bounds.top*2,bounds.width*2,bounds.height*2);const rotatedW=turn%180?bounds.height:bounds.width,rotatedH=turn%180?bounds.width:bounds.height,availableH=viewport.height-bounds.top,fit=Math.min(viewport.width/rotatedW,availableH/rotatedH);ctx.save();ctx.translate(viewport.width,bounds.top*2+availableH);ctx.rotate(turn*Math.PI/180);ctx.scale(fit,fit);ctx.drawImage(crop,-bounds.width/2,-bounds.height/2,bounds.width,bounds.height);ctx.restore();}})().catch(e=>{if(!canceled)callbacks.current.onError(e.message);});return()=>{canceled=true;tasks.forEach(task=>task.cancel());};},[ready,pageSizes,doc.id,rotationKey]);
- useEffect(()=>{if(!ready)return;let canceled=false;let own:any;currentPage.current=page;loading.current=true;
-  (async()=>{await document.fonts.ready;const f=await import('fabric');const viewport=pageSizes[page]??{width:595.28,height:841.89};if(canceled)return;if(initialFit.current&&stage.current){setZoom(Math.min(1.4,Math.max(.4,(stage.current.clientWidth-56)/viewport.width)));initialFit.current=false;}setRotation(state.current.rotations?.[page]??0);
-   own=new f.Canvas(annotationCanvases.current[page]!,{width:viewport.width,height:viewport.height,selection:!readonly,enableRetinaScaling:true});canvas.current=own;await loadObjects(own,state.current.changes??[],page);if(canceled)return;own.getObjects().forEach((o:any)=>o.set({selectable:!readonly,evented:!readonly}));own.renderAll();loading.current=false;
-   own.on('object:modified',capture);own.on('path:created',({path}:any)=>{path.name='Path_'+crypto.randomUUID().slice(0,9);capture();});
-   own.on('text:changed',capture);
-   let start:any=null,shape:any=null;
-   own.on('mouse:down',async(e:any)=>{if(blocked.current||loading.current)return;const m=mode.current;if(['select','draw','highlight'].includes(m.tool))return;const point=own.getScenePoint(e.e);start=point;
-    const common={left:point.x,top:point.y,fill:'transparent',stroke:m.color,strokeWidth:m.width};
-    if(m.tool==='text'){const t=new f.IText('Text',{left:point.x,top:point.y,fill:m.color,fontFamily:m.font,fontSize:m.fontSize,fontWeight:m.bold?'bold':'normal',fontStyle:m.italic?'italic':'normal'});(t as any).name='Text_'+crypto.randomUUID().slice(0,9);own.add(t);own.setActiveObject(t);t.enterEditing();t.selectAll();capture();setTool('select');return;}
-    if(m.tool==='rect')shape=new f.Rect({...common,width:1,height:1});
-    if(m.tool==='circle')shape=new f.Ellipse({...common,rx:1,ry:1});
-    if(m.tool==='arrow')shape=new f.Line([point.x,point.y,point.x,point.y],{stroke:m.color,strokeWidth:m.width});
-    if(shape){shape.name=crypto.randomUUID();own.add(shape);}
-   });
-   own.on('mouse:move',(e:any)=>{if(!shape||!start)return;const p=own.getScenePoint(e.e);const m=mode.current;if(m.tool==='arrow')shape.set({x2:p.x,y2:p.y});else{shape.set({left:Math.min(start.x,p.x),top:Math.min(start.y,p.y)});if(m.tool==='circle')shape.set({rx:Math.abs(p.x-start.x)/2,ry:Math.abs(p.y-start.y)/2});else shape.set({width:Math.abs(p.x-start.x),height:Math.abs(p.y-start.y)});}own.renderAll();});
-   own.on('mouse:up',()=>{if(!shape)return;if(mode.current.tool==='arrow'){const x=shape.x2,y=shape.y2;const angle=Math.atan2(y-shape.y1,x-shape.x1)*180/Math.PI+90;const head=new f.Triangle({left:x,top:y,originX:'center',originY:'center',width:12,height:15,angle,fill:mode.current.color});(head as any).name=crypto.randomUUID();own.add(head);}shape.setCoords();shape=null;start=null;capture();setTool('select');});
-   configureTool(own,f);
-  })().catch(e=>{loading.current=true;callbacks.current.onError(e.message);});
-  return()=>{canceled=true;loading.current=true;if(own){own.dispose();if(canvas.current===own)canvas.current=null;}};
- },[ready,page,pageSizes,doc.id,doc.remoteRevision]);
- function configureTool(c:any,f:any){if(!c)return;const m=mode.current;c.isDrawingMode=!readonly&&['draw','highlight'].includes(m.tool);c.selection=!readonly&&m.tool==='select';c.getObjects().forEach((o:any)=>o.set({selectable:!readonly&&m.tool==='select',evented:!readonly&&m.tool==='select'}));c.defaultCursor=m.tool==='select'?'default':'crosshair';if(c.isDrawingMode){c.freeDrawingBrush=new f.PencilBrush(c);c.freeDrawingBrush.color=m.tool==='highlight'?m.color+'55':m.color;c.freeDrawingBrush.width=m.tool==='highlight'?m.width*6:m.width;}}
- useEffect(()=>{import('fabric').then(f=>configureTool(canvas.current,f));},[tool,color,width,readonly]);
- useEffect(()=>{state.current=doc.state;},[doc.state]);
- useEffect(()=>{const handler=(e:KeyboardEvent)=>{if((e.target as HTMLElement).closest('input,textarea,select')||canvas.current?.getActiveObject()?.isEditing)return;if(readonly)return;if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();remove();}if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);});
- function remove(){const c=canvas.current;if(!c)return;c.getActiveObjects().forEach((o:any)=>c.remove(o));c.discardActiveObject();c.renderAll();capture();}
- function style(key:string,value:any){const c=canvas.current;if(!c||readonly)return;c.getActiveObjects().forEach((o:any)=>o.set({[key]:value}));c.renderAll();capture();}
- async function image(file:File){
-  if(!file||!file.type.startsWith('image/')||file.size>5*1024*1024){onError('Vyberte obrázok do 5 MB.');return;}
-  try{const bitmap=await createImageBitmap(file);const ratio=Math.min(1,1200/Math.max(bitmap.width,bitmap.height));const c=document.createElement('canvas');c.width=Math.round(bitmap.width*ratio);c.height=Math.round(bitmap.height*ratio);c.getContext('2d')!.drawImage(bitmap,0,0,c.width,c.height);bitmap.close();const src=c.toDataURL('image/webp',.85);if(src.length>1_000_000)throw new Error('Obrázok je príliš zložitý. Zmenšite ho a skúste znova.');const f=await import('fabric');const img=await f.FabricImage.fromURL(src);img.scaleToWidth(Math.min(240,size.width-40));img.set({left:30,top:60});(img as any).name='Image_'+crypto.randomUUID().slice(0,9);canvas.current.add(img);canvas.current.setActiveObject(img);capture();}catch(e:any){onError(e.message);}
- }
- function scrollToPage(index:number){pageBounds.current[index]?.scrollIntoView({behavior:'smooth',block:'center'});}
- function updateCurrentPage(){if(!stage.current)return;const center=stage.current.getBoundingClientRect().top+stage.current.clientHeight/2;let best=page,dist=Infinity;pageBounds.current.forEach((node,index)=>{if(!node)return;const rect=node.getBoundingClientRect(),d=Math.abs((rect.top+rect.bottom)/2-center);if(d<dist){dist=d;best=index;}});if(best!==page){setPage(best);setRotation(state.current.rotations?.[best]??0);}}
- const tools=[['select','Vybrať',MousePointer2],['text','Text',Type],['draw','Kresliť',Pencil],['highlight','Zvýrazniť',Highlighter],['arrow','Šípka',ArrowUpRight],['rect','Obdĺžnik',Square],['circle','Elipsa',Circle]] as const;
- return <section className="editor">
-  <div className="toolbar" aria-label="Anotačné nástroje"><div className="toolgroup">{tools.map(([key,label,Icon])=><button key={key} disabled={readonly} title={label} aria-label={label} aria-pressed={tool===key} className={tool===key?'active':''} onClick={()=>chooseTool(key)}><Icon size={18}/></button>)}<label className={'iconbutton '+(readonly?'disabled':'')} title="Vložiť obrázok"><ImagePlus size={18}/><input aria-label="Vložiť obrázok" type="file" accept="image/png,image/jpeg,image/webp" disabled={readonly} hidden onChange={e=>e.target.files?.[0]&&image(e.target.files[0])}/></label></div>
-   <div className="toolgroup"><input aria-label="Farba" type="color" value={color} disabled={readonly} onChange={e=>{setColor(e.target.value);const c=canvas.current;c?.getActiveObjects().forEach((o:any)=>o.set(o.type.toLowerCase().includes('text')?{fill:e.target.value}:{stroke:e.target.value}));c?.renderAll();if(c?.getActiveObjects().length)capture();}}/><select aria-label="Písmo" value={font} disabled={readonly} onChange={e=>{setFont(e.target.value);style('fontFamily',e.target.value);}}>{fonts.map(x=><option key={x}>{x}</option>)}</select><input className="number" type="number" aria-label="Veľkosť písma" min="8" max="120" value={fontSize} disabled={readonly} onChange={e=>{const n=Math.max(8,Math.min(120,+e.target.value));setFontSize(n);style('fontSize',n);}}/><button title="Tučné" aria-label="Tučné" disabled={readonly} aria-pressed={bold} onClick={()=>{const value=canvas.current?.getActiveObject()?.fontWeight==='bold'?false:!bold;setBold(value);style('fontWeight',value?'bold':'normal');}}><Bold size={16}/></button><button title="Kurzíva" aria-label="Kurzíva" disabled={readonly} aria-pressed={italic} onClick={()=>{const value=canvas.current?.getActiveObject()?.fontStyle==='italic'?false:!italic;setItalic(value);style('fontStyle',value?'italic':'normal');}}><Italic size={16}/></button><select aria-label="Hrúbka čiary" value={width} disabled={readonly} onChange={e=>setWidth(+e.target.value)}>{[1,2,3,5,8].map(x=><option key={x} value={x}>{x} px</option>)}</select></div>
-   <div className="toolgroup"><button aria-label="Späť" title="Späť (Ctrl+Z)" disabled={readonly} onClick={undo}><Undo2 size={17}/></button><button aria-label="Znova" title="Znova" disabled={readonly} onClick={redo}><Redo2 size={17}/></button><button aria-label="Odstrániť výber" title="Odstrániť výber" disabled={readonly} onClick={remove}><Trash2 size={17}/></button></div>
-  </div>
-  <div className="pagebar"><div><button aria-label="Predošlá strana" disabled={page===0} onClick={()=>scrollToPage(page-1)}><ChevronLeft size={16}/></button><span>Strana {page+1} / {count}</span><button aria-label="Ďalšia strana" disabled={page+1>=count} onClick={()=>scrollToPage(page+1)}><ChevronRight size={16}/></button></div><div><button aria-label="Zmenšiť" onClick={()=>setZoom(Math.max(.4,zoom-.1))}><ZoomOut size={16}/></button><span>{Math.round(zoom*100)} %</span><button aria-label="Zväčšiť" onClick={()=>setZoom(Math.min(2,zoom+.1))}><ZoomIn size={16}/></button><button disabled={readonly} title="Otočiť obsah" onClick={()=>{const r=(rotation+90)%360;setRotation(r);emit({...state.current,rotations:{...state.current.rotations,[page]:r}});}}><RotateCw size={16}/> Otočiť</button><button disabled={readonly} onClick={()=>{const extra=(state.current.extraPages??0)+1;emit({...state.current,extraPages:extra});const sizes=[...pageSizes,{width:595.28,height:841.89}];setPageSizes(sizes);setCount(sizes.length);setTimeout(()=>scrollToPage(sizes.length-1),0);}}><FilePlus size={16}/> Pridať stranu</button></div></div>
-  <div className="paperwell" ref={stage} onScroll={updateCurrentPage}>{!ready&&<div className="loading">Načítavam PDF…</div>}{pageSizes.map((size,index)=><div key={index} className="paperbounds" ref={node=>{pageBounds.current[index]=node;}} style={{width:size.width*zoom,height:size.height*zoom,visibility:ready?'visible':'hidden'}}><div className="paper" style={{width:size.width,height:size.height,transform:`translate(-50%,-50%) scale(${zoom})`}}>{index<pdf.current?.numPages&&<canvas ref={node=>{pdfCanvases.current[index]=node;}} style={{position:'absolute',inset:0,width:size.width,height:size.height}}/>}<div className="annotation" style={{visibility:index===page?'visible':'hidden'}}><canvas ref={node=>{annotationCanvases.current[index]=node;}}/></div></div></div>)}</div>
- </section>;
+"use client";
+import EditorToolbar from "@/components/editor/editor-toolbar";
+import PageControls from "@/components/editor/page-controls";
+import PageStack from "@/components/editor/page-stack";
+import { useAnnotationCanvas } from "@/hooks/editor/use-annotation-canvas";
+import { useEditHistory } from "@/hooks/editor/use-edit-history";
+import { usePdfPages } from "@/hooks/editor/use-pdf-pages";
+import { constrainComment } from "@/lib/editor/page-comment";
+import { insertImage } from "@/lib/editor/insert-image";
+
+import { type Preferences, type ToolKey } from "@/lib/preferences";
+import { useEffect, useRef, useState } from "react";
+type Props = {
+  defaults: Preferences["tools"];
+  doc: any;
+  projectId: string;
+  readonly: boolean;
+  onChange: (state: any) => void;
+  onError: (s: string) => void;
+  register: (api: any) => void;
+};
+export default function PdfEditor({
+  defaults,
+  doc,
+  projectId,
+  readonly,
+  onChange,
+  onError,
+  register,
+}: Props) {
+  const stage = useRef<HTMLDivElement>(null),
+    annotationHosts = useRef<(HTMLDivElement | null)[]>([]),
+    pdfCanvases = useRef<(HTMLCanvasElement | null)[]>([]),
+    pageBounds = useRef<(HTMLDivElement | null)[]>([]);
+  const blocked = useRef(readonly);
+  blocked.current = readonly;
+  const canvas = useRef<any>(null),
+    pdf = useRef<any>(null),
+    state = useRef<any>(doc.state),
+    callbacks = useRef({ onChange, onError });
+  callbacks.current = { onChange, onError };
+  const [page, setPage] = useState(0),
+    [count, setCount] = useState(1),
+    [pageSizes, setPageSizes] = useState<{ width: number; height: number }[]>(
+      [],
+    ),
+    [tool, setTool] = useState("select"),
+    [color, setColor] = useState(defaults.text.color),
+    [font, setFont] = useState(defaults.text.font),
+    [fontSize, setFontSize] = useState(defaults.text.fontSize),
+    [width, setWidth] = useState(defaults.text.width),
+    [zoom, setZoom] = useState(1),
+    [ready, setReady] = useState(false),
+    [rotation, setRotation] = useState(0);
+  const [bold, setBold] = useState(defaults.text.bold),
+    [italic, setItalic] = useState(defaults.text.italic);
+  function applyDefaults(key: ToolKey) {
+    const value = defaults[key];
+    setColor(value.color);
+    setFont(value.font);
+    setFontSize(value.fontSize);
+    setWidth(value.width);
+    setBold(value.bold);
+    setItalic(value.italic);
+  }
+  function chooseTool(key: string) {
+    setTool(key);
+    if (key !== "select") applyDefaults(key as ToolKey);
+  }
+  useEffect(() => {
+    applyDefaults(tool === "select" ? "text" : (tool as ToolKey));
+  }, [defaults]);
+  const mode = useRef({ tool, color, font, fontSize, width, bold, italic });
+  mode.current = { tool, color, font, fontSize, width, bold, italic };
+  const size = pageSizes[page] ?? { width: 595.28, height: 841.89 };
+  const rotationKey = JSON.stringify(doc.state.rotations ?? {});
+  const initialFit = useRef(true);
+  const loading = useRef(false),
+    currentPage = useRef(0);
+
+  const { history, future, emit, capture, undo, redo, stamp, removeScore } =
+    useEditHistory({
+      canvas,
+      blocked,
+      loading,
+      state,
+      callbacks,
+      currentPage,
+      setRotation,
+      pdf,
+      setCount,
+      setPageSizes,
+      size,
+      defaults,
+    });
+
+  usePdfPages({
+    ready,
+    pdf,
+    doc,
+    projectId,
+    state,
+    setPage,
+    setPageSizes,
+    setReady,
+    initialFit,
+    history,
+    future,
+    setCount,
+    callbacks,
+    pdfCanvases,
+    pageSizes,
+    rotationKey,
+  });
+  useAnnotationCanvas({
+    ready,
+    currentPage,
+    page,
+    loading,
+    pageSizes,
+    initialFit,
+    stage,
+    setZoom,
+    setRotation,
+    state,
+    annotationHosts,
+    readonly,
+    canvas,
+    capture,
+    blocked,
+    mode,
+    setTool,
+    callbacks,
+    doc,
+    tool,
+    color,
+    width,
+  });
+  register({ stamp, removeScore, undo, redo });
+
+  useEffect(() => {
+    state.current = doc.state;
+  }, [doc.state]);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (
+        (e.target as HTMLElement).closest("input,textarea,select") ||
+        canvas.current?.getActiveObject()?.isEditing
+      )
+        return;
+      if (readonly) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        remove();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+  function remove() {
+    const c = canvas.current;
+    if (!c) return;
+    c.getActiveObjects().forEach((o: any) => c.remove(o));
+    c.discardActiveObject();
+    c.renderAll();
+    capture();
+  }
+  function style(key: string, value: any) {
+    const c = canvas.current;
+    if (!c || readonly) return;
+    c.getActiveObjects().forEach((o: any) => {
+      o.set({ [key]: value });
+      constrainComment(o, size.width);
+    });
+    c.renderAll();
+    capture();
+  }
+  async function image(file: File) {
+    await insertImage(file, { canvas, size, capture, onError });
+  }
+  function scrollToPage(index: number) {
+    pageBounds.current[index]?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }
+  function updateCurrentPage() {
+    if (!stage.current) return;
+    const center =
+      stage.current.getBoundingClientRect().top +
+      stage.current.clientHeight / 2;
+    let best = page,
+      dist = Infinity;
+    pageBounds.current.forEach((node, index) => {
+      if (!node) return;
+      const rect = node.getBoundingClientRect(),
+        d = Math.abs((rect.top + rect.bottom) / 2 - center);
+      if (d < dist) {
+        dist = d;
+        best = index;
+      }
+    });
+    if (best !== page) {
+      setPage(best);
+      setRotation(state.current.rotations?.[best] ?? 0);
+    }
+  }
+
+  return (
+    <section className="editor">
+      <EditorToolbar
+        readonly={readonly}
+        tool={tool}
+        chooseTool={chooseTool}
+        image={image}
+        color={color}
+        setColor={setColor}
+        canvas={canvas}
+        capture={capture}
+        font={font}
+        setFont={setFont}
+        style={style}
+        fontSize={fontSize}
+        setFontSize={setFontSize}
+        bold={bold}
+        setBold={setBold}
+        italic={italic}
+        setItalic={setItalic}
+        width={width}
+        setWidth={setWidth}
+        undo={undo}
+        redo={redo}
+        remove={remove}
+      />
+      <PageControls
+        pdf={pdf}
+        onError={onError}
+        page={page}
+        count={count}
+        scrollToPage={scrollToPage}
+        zoom={zoom}
+        setZoom={setZoom}
+        readonly={readonly}
+        rotation={rotation}
+        setRotation={setRotation}
+        emit={emit}
+        state={state}
+        pageSizes={pageSizes}
+        setPageSizes={setPageSizes}
+        setCount={setCount}
+      />
+      <PageStack
+        changes={doc.state.changes}
+        stage={stage}
+        updateCurrentPage={updateCurrentPage}
+        ready={ready}
+        pageSizes={pageSizes}
+        zoom={zoom}
+        pageBounds={pageBounds}
+        pdf={pdf}
+        pdfCanvases={pdfCanvases}
+        page={page}
+        annotationHosts={annotationHosts}
+      />
+    </section>
+  );
 }

@@ -1,11 +1,183 @@
-'use client';
-import {useEffect,useRef,useState} from 'react';
-import {Settings,ChevronDown} from 'lucide-react';
-import {fonts,toolNames,defaultStyle,type ToolKey,type Preferences} from '@/lib/preferences';
-export default function ToolSettings({tools,onSave}:{tools:Preferences['tools'];onSave:(tools:Preferences['tools'])=>Promise<void>}){
- const menu=useRef<HTMLDetailsElement>(null);
- useEffect(()=>{const close=(e:PointerEvent)=>{if(menu.current&&!menu.current.contains(e.target as Node))menu.current.open=false;};const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'&&menu.current?.open){menu.current.open=false;menu.current.querySelector('summary')?.focus();}};document.addEventListener('pointerdown',close);document.addEventListener('keydown',escape);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',escape);};},[]);
- const [draft,setDraft]=useState(tools),[tool,setTool]=useState<ToolKey>('text'),[saving,setSaving]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);const value=draft[tool];
- function change(patch:any){setDraft({...draft,[tool]:{...value,...patch}});setSaved(false);}
- return <details ref={menu} className="toolsettings" onToggle={e=>{if(e.currentTarget.open){setDraft(tools);setSaved(false);setError('');}}}><summary aria-label="Nastavenia nástrojov"><Settings size={17}/><span>Nastavenia</span><ChevronDown size={13}/></summary><form className="settingspanel" onSubmit={async e=>{e.preventDefault();setSaving(true);setError('');try{await onSave(draft);setSaved(true);}catch(e:any){setError(e.message??'Nastavenia sa nepodarilo uložiť.');}finally{setSaving(false);}}}><h2>Predvolené nástroje</h2><label>Nástroj<select value={tool} onChange={e=>setTool(e.target.value as ToolKey)}>{Object.entries(toolNames).map(([key,name])=><option value={key} key={key}>{name}</option>)}</select></label><label>Farba<input type="color" value={value.color} onChange={e=>change({color:e.target.value})}/></label>{['text','stamp'].includes(tool)?<><label>Písmo<select value={value.font} onChange={e=>change({font:e.target.value})}>{fonts.map(font=><option key={font}>{font}</option>)}</select></label><label>Veľkosť písma<input type="number" min="8" max="120" required value={value.fontSize} onChange={e=>change({fontSize:+e.target.value})}/></label><div className="settingschecks"><label><input type="checkbox" checked={value.bold} onChange={e=>change({bold:e.target.checked})}/>Tučné</label><label><input type="checkbox" checked={value.italic} onChange={e=>change({italic:e.target.checked})}/>Kurzíva</label></div></>:<label>Hrúbka čiary<select value={value.width} onChange={e=>change({width:+e.target.value})}>{[1,2,3,5,8].map(n=><option key={n} value={n}>{n} px</option>)}</select></label>}<p className="muted">Uložené vo vašom účte. Použijú sa pri výbere nástroja.</p>{error&&<p role="alert">{error}</p>}{saved&&<p role="status">Nastavenia uložené.</p>}<div className="settingsactions"><button type="button" disabled={saving} onClick={()=>{setDraft({...draft,[tool]:defaultStyle(tool)});setSaved(false);}}>Obnoviť nástroj</button><button type="submit" className="primary" disabled={saving}>{saving?'Ukladám…':'Uložiť'}</button></div></form></details>;
+"use client";
+import {
+  defaultStyle,
+  fonts,
+  toolNames,
+  type Preferences,
+  type ToolKey,
+} from "@/lib/preferences";
+import { ChevronDown, Settings } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+export default function ToolSettings({
+  tools,
+  onSave,
+}: {
+  tools: Preferences["tools"];
+  onSave: (tools: Preferences["tools"]) => Promise<void>;
+}) {
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: PointerEvent) => {
+      if (menu.current && !menu.current.contains(e.target as Node))
+        menu.current.open = false;
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && menu.current?.open) {
+        menu.current.open = false;
+        menu.current.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
+  const [draft, setDraft] = useState(tools),
+    [tool, setTool] = useState<ToolKey>("text"),
+    [saving, setSaving] = useState(false),
+    [error, setError] = useState(""),
+    [saved, setSaved] = useState(false);
+  const value = draft[tool];
+  function change(patch: any) {
+    setDraft({ ...draft, [tool]: { ...value, ...patch } });
+    setSaved(false);
+  }
+  return (
+    <details
+      ref={menu}
+      className="toolsettings"
+      onToggle={(e) => {
+        if (e.currentTarget.open) {
+          setDraft(tools);
+          setSaved(false);
+          setError("");
+        }
+      }}
+    >
+      <summary aria-label="Nastavenia nástrojov">
+        <Settings size={17} />
+        <span>Nastavenia</span>
+        <ChevronDown size={13} />
+      </summary>
+      <form
+        className="settingspanel"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setSaving(true);
+          setError("");
+          try {
+            await onSave(draft);
+            setSaved(true);
+          } catch (e: any) {
+            setError(e.message ?? "Nastavenia sa nepodarilo uložiť.");
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <h2>Predvolené nástroje</h2>
+        <label>
+          Nástroj
+          <select
+            value={tool}
+            onChange={(e) => setTool(e.target.value as ToolKey)}
+          >
+            {Object.entries(toolNames).map(([key, name]) => (
+              <option value={key} key={key}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Farba
+          <input
+            type="color"
+            value={value.color}
+            onChange={(e) => change({ color: e.target.value })}
+          />
+        </label>
+        {["text", "stamp"].includes(tool) ? (
+          <>
+            <label>
+              Písmo
+              <select
+                value={value.font}
+                onChange={(e) => change({ font: e.target.value })}
+              >
+                {fonts.map((font) => (
+                  <option key={font}>{font}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Veľkosť písma
+              <input
+                type="number"
+                min="8"
+                max="120"
+                required
+                value={value.fontSize}
+                onChange={(e) => change({ fontSize: +e.target.value })}
+              />
+            </label>
+            <div className="settingschecks">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={value.bold}
+                  onChange={(e) => change({ bold: e.target.checked })}
+                />
+                Tučné
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={value.italic}
+                  onChange={(e) => change({ italic: e.target.checked })}
+                />
+                Kurzíva
+              </label>
+            </div>
+          </>
+        ) : (
+          <label>
+            Hrúbka čiary
+            <select
+              value={value.width}
+              onChange={(e) => change({ width: +e.target.value })}
+            >
+              {[1, 2, 3, 5, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n} px
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <p className="muted">
+          Uložené vo vašom účte. Použijú sa pri výbere nástroja.
+        </p>
+        {error && <p role="alert">{error}</p>}
+        {saved && <p role="status">Nastavenia uložené.</p>}
+        <div className="settingsactions">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => {
+              setDraft({ ...draft, [tool]: defaultStyle(tool) });
+              setSaved(false);
+            }}
+          >
+            Obnoviť nástroj
+          </button>
+          <button type="submit" className="primary" disabled={saving}>
+            {saving ? "Ukladám…" : "Uložiť"}
+          </button>
+        </div>
+      </form>
+    </details>
+  );
 }

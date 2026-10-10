@@ -1,10 +1,5 @@
 export type Json =
-  | null
-  | boolean
-  | number
-  | string
-  | Json[]
-  | { [key: string]: Json };
+  null | boolean | number | string | Json[] | { [key: string]: Json };
 
 export type ConnectorFailureStatus =
   | "invalid_request"

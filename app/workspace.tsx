@@ -1,159 +1,270 @@
-'use client';
-import { useEffect,useRef,useState } from 'react';
-import { SignInButton,SignUpButton,UserButton,useUser } from '@clerk/nextjs';
-import { FileText,Plus,Upload,Download,Users,Search,Check,ChevronLeft,ChevronRight,FolderOpen,Tag,X,Link,ShieldCheck,Save } from 'lucide-react';
-import dynamic from 'next/dynamic';
-import Thumbnail from './thumbnail';
-import ToolSettings from './tool-settings';
-import {categoryLabel,compareCategories,readPreferences,type Preferences} from '@/lib/preferences';
-import {mergeDecision,normalizedState} from '@/lib/merge';
-import { api,download } from '@/lib/client-api';
-import {tagName,collectTags,normalizeArnoldLegacy,normalizeArnoldProject,normalizeArnoldTagValues} from '@/lib/tags';
-import { parseSubmission,exportName,projectTitle,gradedFilePath,legacyGradedFilePath } from '@/lib/archive';
-const PdfEditor=dynamic(()=>import('./pdf-editor'),{ssr:false,loading:()=> <div className="loading">Pripravujem editor…</div>});
-function sameBytes(a:Uint8Array,b:Uint8Array){if(a.byteLength!==b.byteLength)return false;for(let i=0;i<a.byteLength;i++)if(a[i]!==b[i])return false;return true;}
-function stateComments(state:any){if(Array.isArray(state.scoring?.comments))return state.scoring.comments;const comments=(state.changes??[]).filter((change:any)=>change.type==='Text'&&change.data?.text&&change.data?.name!==state.scoring?.annotName).map((change:any)=>change.data.text);return state.scoring?.points==null?comments:[...comments,`${state.scoring.points}B`];}
-async function sameGradedSubmission(projectId:string,doc:any,incoming:any,pdf:Uint8Array){if(doc.state.scoring?.points!==incoming.scoring?.points||JSON.stringify(stateComments(doc.state))!==JSON.stringify(stateComments(incoming)))return false;
- const matches=async(url:string)=>{try{const response=await fetch(url);if(!response.ok)return false;return sameBytes(new Uint8Array(await response.arrayBuffer()),pdf);}catch{return false;}};
- const base=`/api/projects/${projectId}/documents/${doc.id}/file`;if(doc.graded&&await matches(base+'?graded=1'))return true;if(await matches(base))return true;
- const state=doc.state;if(!state.changes?.length&&!state.extraPages&&!Object.values(state.rotations??{}).some((value:any)=>value!==0))return false;
- try{const response=await fetch(base);if(!response.ok)return false;const original=new Uint8Array(await response.arrayBuffer());const {flattenPdf}=await import('@/lib/pdf-engine');return sameBytes(await flattenPdf(original,state),pdf);}catch{return false;}
+"use client";
+import GradingSidebar from "@/components/workspace/grading-sidebar";
+import ImportScoreDialog from "@/components/workspace/import-score-dialog";
+import MergeDialog from "@/components/workspace/merge-dialog";
+import ProjectEmpty from "@/components/workspace/project-empty";
+import ProjectList from "@/components/workspace/project-list";
+import ProjectToolbar from "@/components/workspace/project-toolbar";
+import ShareDialog from "@/components/workspace/share-dialog";
+import SubmissionsSidebar from "@/components/workspace/submissions-sidebar";
+import Welcome from "@/components/workspace/welcome";
+import WorkspaceHeader from "@/components/workspace/workspace-header";
+import { useWorkspace } from "@/hooks/use-workspace";
+import { download } from "@/lib/client-api";
+import { X } from "lucide-react";
+import dynamic from "next/dynamic";
+const PdfEditor = dynamic(() => import("./pdf-editor"), {
+  ssr: false,
+  loading: () => <div className="loading">Pripravujem editor…</div>,
+});
+export default function Workspace() {
+  const {
+    scoreCorrection,
+    isSignedIn,
+    preferences,
+    persistPreferences,
+    error,
+    saveStatus,
+    current,
+    dirty,
+    setError,
+    open,
+    project,
+    mergeConflicts,
+    setMergeOpen,
+    mergeOpen,
+    mergeDialog,
+    setMergeConflicts,
+    busy,
+    resolveMerge,
+    isLoaded,
+    projects,
+    hasJoin,
+    join,
+    create,
+    newTitle,
+    setNewTitle,
+    save,
+    setProject,
+    list,
+    report,
+    readonly,
+    exportZip,
+    openSharing,
+    sharing,
+    shareDialog,
+    setSharing,
+    email,
+    setEmail,
+    memberRole,
+    setMemberRole,
+    members,
+    setMembers,
+    link,
+    setLink,
+    importZip,
+    query,
+    setQuery,
+    projectPreferences,
+    setProjectPreferences,
+    filter,
+    setFilter,
+    allTags,
+    tagFilter,
+    setTagFilter,
+    categories,
+    categoryOptions,
+    setCategories,
+    documents,
+    active,
+    switchDoc,
+    nextDocument,
+    openNext,
+    doc,
+    changed,
+    editor,
+    applyGrade,
+    projectTags,
+    toggleTag,
+    tag,
+    setTag,
+  } = useWorkspace();
+  return (
+    <main>
+      {scoreCorrection.issues.length > 0 && (
+        <ImportScoreDialog {...scoreCorrection} />
+      )}
+      <WorkspaceHeader
+        isSignedIn={isSignedIn}
+        preferences={preferences}
+        persistPreferences={persistPreferences}
+      />
+      {error && (
+        <div role="alert" className="notice error">
+          <span>{error}</span>
+          {saveStatus === "Konflikt zmien" && (
+            <>
+              <button
+                onClick={() =>
+                  download(
+                    new Blob(
+                      [JSON.stringify(current.current.doc.state, null, 2)],
+                      { type: "application/json" },
+                    ),
+                    "moje-neulozene-zmeny.json",
+                  )
+                }
+              >
+                Stiahnuť moje zmeny
+              </button>
+              <button
+                onClick={() => {
+                  dirty.current = false;
+                  setError("");
+                  open(project.id);
+                }}
+              >
+                Načítať serverovú verziu
+              </button>
+            </>
+          )}
+          <button aria-label="Zavrieť upozornenie" onClick={() => setError("")}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {mergeConflicts.length > 0 && !mergeOpen && (
+        <div className="notice progress">
+          <span>
+            {mergeConflicts.length} nevyriešených konfliktov pri importe.
+          </span>
+          <button onClick={() => setMergeOpen(true)}>Vyriešiť konflikty</button>
+        </div>
+      )}
+      {mergeOpen && (
+        <MergeDialog
+          mergeDialog={mergeDialog}
+          setMergeOpen={setMergeOpen}
+          error={error}
+          mergeConflicts={mergeConflicts}
+          setMergeConflicts={setMergeConflicts}
+          busy={busy}
+          resolveMerge={resolveMerge}
+        />
+      )}
+      {busy && (
+        <div className="notice progress" role="status">
+          <span className="pulse" />
+          {busy}
+        </div>
+      )}
+      {!isLoaded ? (
+        <div className="loading">Načítavam…</div>
+      ) : !isSignedIn ? (
+        <Welcome />
+      ) : !project ? (
+        <ProjectList
+          projects={projects}
+          hasJoin={hasJoin}
+          join={join}
+          busy={busy}
+          create={create}
+          newTitle={newTitle}
+          setNewTitle={setNewTitle}
+          open={open}
+        />
+      ) : (
+        <>
+          <ProjectToolbar
+            save={save}
+            setProject={setProject}
+            list={list}
+            report={report}
+            busy={busy}
+            project={project}
+            saveStatus={saveStatus}
+            readonly={readonly}
+            exportZip={exportZip}
+            mergeConflicts={mergeConflicts}
+            openSharing={openSharing}
+          />
+          {sharing && (
+            <ShareDialog
+              shareDialog={shareDialog}
+              setSharing={setSharing}
+              project={project}
+              email={email}
+              setEmail={setEmail}
+              memberRole={memberRole}
+              setMemberRole={setMemberRole}
+              members={members}
+              setMembers={setMembers}
+              link={link}
+              setLink={setLink}
+              report={report}
+            />
+          )}
+          <div className="workspace">
+            <SubmissionsSidebar
+              project={project}
+              readonly={readonly}
+              busy={busy}
+              importZip={importZip}
+              query={query}
+              setQuery={setQuery}
+              projectPreferences={projectPreferences}
+              setProjectPreferences={setProjectPreferences}
+              filter={filter}
+              setFilter={setFilter}
+              allTags={allTags}
+              tagFilter={tagFilter}
+              setTagFilter={setTagFilter}
+              categories={categories}
+              categoryOptions={categoryOptions}
+              setCategories={setCategories}
+              documents={documents}
+              active={active}
+              switchDoc={switchDoc}
+              nextDocument={nextDocument}
+              openNext={openNext}
+            />
+            {doc ? (
+              <>
+                <PdfEditor
+                  defaults={preferences.tools}
+                  key={doc.id}
+                  doc={doc}
+                  projectId={project.id}
+                  readonly={readonly || !!busy}
+                  onChange={changed}
+                  onError={report}
+                  register={(a) => {
+                    editor.current = a;
+                  }}
+                />
+                <GradingSidebar
+                  doc={doc}
+                  readonly={readonly}
+                  busy={busy}
+                  applyGrade={applyGrade}
+                  editor={editor}
+                  projectTags={projectTags}
+                  toggleTag={toggleTag}
+                  tag={tag}
+                  setTag={setTag}
+                  changed={changed}
+                />
+              </>
+            ) : (
+              <ProjectEmpty
+                readonly={readonly}
+                busy={busy}
+                importZip={importZip}
+              />
+            )}
+          </div>
+        </>
+      )}
+    </main>
+  );
 }
-export default function Workspace(){
- const {isLoaded,isSignedIn,user}=useUser();const [projects,setProjects]=useState<any[]>([]),[project,setProject]=useState<any>(null),[active,setActive]=useState<string|null>(null),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[tagFilter,setTagFilter]=useState(''),[newTitle,setNewTitle]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState(''),[saveStatus,setSaveStatus]=useState('Uložené'),[sharing,setSharing]=useState(false),[members,setMembers]=useState<any[]>([]),[email,setEmail]=useState(''),[memberRole,setMemberRole]=useState('editor'),[link,setLink]=useState(''),[tag,setTag]=useState(''),[mergeConflicts,setMergeConflicts]=useState<any[]>([]),[mergeOpen,setMergeOpen]=useState(false);
- const [preferences,setPreferences]=useState<Preferences>(()=>readPreferences({}));const preferencesRef=useRef(preferences),preferenceQueue=useRef<Promise<any>>(Promise.resolve());
- useEffect(()=>{const value=readPreferences(user?.unsafeMetadata?.opravovna);preferencesRef.current=value;setPreferences(value);},[user?.id]);
- async function persistPreferences(patch:Partial<Preferences>){if(!user)throw new Error('Prihláste sa.');const value={...preferencesRef.current,...patch};preferencesRef.current=value;setPreferences(value);const pending=preferenceQueue.current.catch(()=>{}).then(()=>user.update({unsafeMetadata:{...user.unsafeMetadata,opravovna:value}}));preferenceQueue.current=pending;await pending;}
- const projectPreferences=preferences.projects[project?.id]??{categories:[],sort:'name' as const};const categories=projectPreferences.categories;
- function setProjectPreferences(patch:Partial<typeof projectPreferences>){persistPreferences({projects:{...preferencesRef.current.projects,[project.id]:{...(preferencesRef.current.projects[project.id]??{categories:[],sort:'name'}),...patch}}}).catch(report);}
- function setCategories(value:string[]){setProjectPreferences({categories:value});}
- const mergeDialog=useRef<HTMLDialogElement>(null);const mergePending=useRef(0);mergePending.current=mergeConflicts.length;
- useEffect(()=>{if(mergeOpen)mergeDialog.current?.showModal();else mergeDialog.current?.close();},[mergeOpen]);
- const shareDialog=useRef<HTMLDialogElement>(null);
- useEffect(()=>{if(sharing)shareDialog.current?.showModal();else shareDialog.current?.close();},[sharing]);
- const current=useRef<any>(null),dirty=useRef(false),saving=useRef<Promise<any>|null>(null),timer=useRef<any>(null),editor=useRef<any>(null),busyRef=useRef('');busyRef.current=busy;
- const doc=project?.documents.find((d:any)=>d.id===active);current.current={project,active,doc};
- const readonly=project?.role==='viewer';
- async function list(){setProjects(await api('projects'));}
- function report(e:any){setError(typeof e==='string'?e:e.message);}
- async function open(pid:string){if(!await save())return;setBusy('Načítavam projekt…');try{const p=normalizeArnoldProject(await api('projects/'+pid));setProject(p);setActive(p.documents[0]?.id??null);setSharing(false);dirty.current=false;setSaveStatus('Uložené');}catch(e){report(e);}finally{setBusy('');}}
- async function create(e:React.FormEvent){e.preventDefault();setError('');try{const p=await api('projects',{method:'POST',body:JSON.stringify({title:newTitle.trim()||'Nový projekt'})});setNewTitle('');await list();await open(p.id);}catch(e){report(e);}}
- function changed(state:any){const previous=current.current.project,activeId=current.current.active;if(!previous)return;dirty.current=true;setSaveStatus('Neuložené zmeny');const oldDoc=previous.documents.find((d:any)=>d.id===activeId),next={...previous,legacy:{...previous.legacy,tags:collectTags(previous.legacy.tags??[],oldDoc?.state.tags??[],state.tags??[])},documents:previous.documents.map((d:any)=>d.id===activeId?{...d,state}:d)};current.current.project=next;current.current.doc=next.documents.find((d:any)=>d.id===activeId);setProject(next);clearTimeout(timer.current);timer.current=setTimeout(()=>save(),1000);}
- async function save():Promise<boolean>{
-  clearTimeout(timer.current);if(saving.current)await saving.current;if(!dirty.current)return true;const {project:p,doc:d}=current.current;if(!p||!d)return true;
-  const snapshot=d.state;dirty.current=false;setSaveStatus('Ukladám…');
-  saving.current=(async()=>{try{const r=await api(`projects/${p.id}/documents/${d.id}`,{method:'PATCH',body:JSON.stringify({state:snapshot,revision:d.revision})});setProject((x:any)=>x?.id===p.id?{...x,documents:x.documents.map((v:any)=>v.id===d.id?{...v,revision:r.revision}:v)}:x);if(!dirty.current)setSaveStatus('Uložené');return true;}catch(e:any){dirty.current=true;setSaveStatus(e.status===409?'Konflikt zmien':'Uloženie zlyhalo');report(e);return false;}finally{saving.current=null;}})();return saving.current;
- }
- useEffect(()=>{if(!isSignedIn)return;list().catch(report);},[isSignedIn]);
- useEffect(()=>{const unload=(e:BeforeUnloadEvent)=>{if(dirty.current||busyRef.current||mergePending.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',unload);return()=>window.removeEventListener('beforeunload',unload);},[]);
- useEffect(()=>{if(!project)return;const id=setInterval(async()=>{if(dirty.current||saving.current||busyRef.current)return;try{const p=normalizeArnoldProject(await api('projects/'+project.id));if(dirty.current||saving.current||busyRef.current)return;setProject((old:any)=>({...p,documents:p.documents.map((d:any)=>{const prev=old.documents.find((x:any)=>x.id===d.id);return {...d,remoteRevision:prev?.revision!==d.revision?d.revision:prev?.remoteRevision};})}));}catch(e){report(e);}},5000);return()=>clearInterval(id);},[project?.id]);
- async function switchDoc(id:string){if(await save()){dirty.current=false;setActive(id);}}
- async function applyGrade(points:number){await editor.current?.stamp(points);}
- async function importZip(file:File){if(!file)return;if(mergePending.current){report('Najprv vyriešte konflikty z predchádzajúceho importu.');return;}if(!await save())return;setError('');let uploadId:string|undefined;
-  try{
-   if(!file.name.toLowerCase().endsWith('.zip')||file.size>1024**3)throw new Error('Vyberte ZIP archív do 1 GB.');
-   setBusy('Kontrolujem archív…');const JSZip=(await import('jszip')).default;const zip=await JSZip.loadAsync(file);const entries=Object.values(zip.files).filter(x=>!x.dir);let total=0;
-   let pdfs=entries.filter(x=>parseSubmission(x.name));const gradedOnly=!pdfs.length;if(gradedOnly)pdfs=entries.filter(x=>/_graded\.pdf$/i.test(x.name)&&parseSubmission(x.name.replace(/_graded\.pdf$/i,'.pdf')));if(!pdfs.length)throw new Error('ZIP neobsahuje riešenia vo formáte p4-c8-meno-12345.pdf.');if(pdfs.length>2000)throw new Error('Najviac 2000 riešení na projekt.');
-   // Validate before creating files; no archive paths are ever used as storage keys.
-   for(const f of entries){if(f.name.includes('..')||(f.name.startsWith('/')&&f.name!=='/points.json')||f.name.includes('\\'))throw new Error('Archív obsahuje neplatnú cestu.');total+=(f as any)._data?.uncompressedSize??0;}if(total>2*1024**3)throw new Error('Rozbalený archív je príliš veľký.');
-   if(!gradedOnly&&project.folder&&pdfs.some(f=>{const folder=parseSubmission(f.name)?.folder;return Boolean(folder&&folder!==project.folder);}))throw new Error('Tento ZIP patrí do iného projektu. Vytvorte nový projekt.');
-   const pid=project.id;const root='projects/'+pid;const conflicts:any[]=[];let incomingLegacy:any={};if(zip.file('changes.arn')){const {unpack}=await import('msgpackr');incomingLegacy=normalizeArnoldLegacy(unpack(await zip.file('changes.arn')!.async('uint8array')));}
-   const pointsFile=entries.find(x=>/(^|\/)points?\.json$/i.test(x.name.replace(/^\//,'')));let pointScores:any={};if(pointsFile){const parsed=JSON.parse(await pointsFile.async('string'));if(!parsed||typeof parsed!=='object'||!parsed.scores||typeof parsed.scores!=='object')throw new Error('Neplatný formát points.json.');pointScores=parsed.scores;incomingLegacy.changes??={};for(const [id,score] of Object.entries(pointScores)){if(!score||typeof score!=='object'||!Number.isFinite(Number((score as any).points)))continue;const old=incomingLegacy.changes[id]??{};incomingLegacy.changes[id]={...old,scoring:{...old.scoring,...score}};}}
-   const up=await api(root+'/archive',{method:'POST'});uploadId=up.id;
-   const chunk=8*1024*1024;for(let offset=0,n=1;offset<file.size;offset+=chunk,n++){setBusy(`Ukladám ZIP na server… ${Math.round(offset/file.size*100)} %`);await api(root+'/uploads/'+up.id+'?part='+n,{method:'PUT',body:file.slice(offset,offset+chunk)});}
-   await api(root+'/uploads/'+up.id,{method:'POST'});uploadId=undefined;
-   if(zip.file('changes.arn'))await api(root+'/legacy?merge=1',{method:'PUT',body:await zip.file('changes.arn')!.async('uint8array') as any});
-   let sidecar:any={};if(zip.file('opravovna.json')){sidecar=JSON.parse(await zip.file('opravovna.json')!.async('string'));if(sidecar.version!==1)throw new Error('Nepodporovaná verzia opravovna.json.');}
-   let next=0,completed=0,stopped=false;
-   const worker=async()=>{while(!stopped){const i=next++;if(i>=pdfs.length)return;
-    const f=pdfs[i],sourcePath=gradedOnly?f.name.replace(/_graded\.pdf$/i,'.pdf'):f.name,meta=parseSubmission(sourcePath)!,pdfBytes=await f.async('uint8array');
-    try{
-     const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(sourcePath)},body:pdfBytes as any});
-     const graded=gradedOnly?null:zip.file(gradedFilePath(f.name))??zip.file(legacyGradedFilePath(f.name,meta.submissionId));if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
-     const incoming=normalizedState(sidecar.documents?.[sourcePath]??incomingLegacy.changes?.[meta.submissionId]);incoming.tags=normalizeArnoldTagValues(incoming.tags,incomingLegacy.tags);if(incoming.scoring?.points==null&&pointScores[meta.submissionId])incoming.scoring={...incoming.scoring,...pointScores[meta.submissionId]};
-     if(d.existing){if(await sameGradedSubmission(pid,d,incoming,pdfBytes)){completed++;setBusy(`Importujem riešenia… ${completed} / ${pdfs.length} (3 súbežne)`);continue;}const decision=mergeDecision(d.state,incoming);
-      if(decision==='conflict')conflicts.push({projectId:pid,id:d.id,path:sourcePath,metadata:meta,first:d.state,second:incoming,revision:d.revision,choice:''});
-      if(decision==='replace'){try{await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:d.revision})});}catch(e:any){if(e.status!==409)throw e;const latest=await api(root);const now=latest.documents.find((x:any)=>x.id===d.id);conflicts.push({projectId:pid,id:d.id,path:sourcePath,metadata:meta,first:now.state,second:incoming,revision:now.revision,choice:''});}}
-     }else if(sidecar.documents?.[sourcePath]||pointScores[meta.submissionId])await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:0})});
-     completed++;setBusy(`Importujem riešenia… ${completed} / ${pdfs.length} (3 súbežne)`);
-    }catch(e){stopped=true;throw e;}
-   }};
-   const results=await Promise.allSettled(Array.from({length:Math.min(3,pdfs.length)},worker));
-   const failed=results.find(r=>r.status==='rejected');if(failed?.status==='rejected')throw failed.reason;
-   await list();await open(pid);if(conflicts.length){setMergeConflicts(conflicts.sort((a,b)=>a.metadata.name.localeCompare(b.metadata.name)));setMergeOpen(true);}
-  }catch(e){report(e);}finally{if(uploadId)api('projects/'+project.id+'/uploads/'+uploadId,{method:'DELETE'}).catch(()=>{});setBusy('');}
- }
- async function resolveMerge(){const pid=mergeConflicts[0]?.projectId??project?.id;setBusy('Zlučujem vybrané verzie…');setError('');try{
-  for(const conflict of mergeConflicts){if(conflict.choice!=='second'){setMergeConflicts(old=>old.filter(x=>x.id!==conflict.id));continue;}
-   try{await api(`projects/${pid}/documents/${conflict.id}`,{method:'PATCH',body:JSON.stringify({state:conflict.second,revision:conflict.revision})});setMergeConflicts(old=>old.filter(x=>x.id!==conflict.id));}
-   catch(e:any){if(e.status===409){const fresh=await api('projects/'+pid);const now=fresh.documents.find((x:any)=>x.id===conflict.id);setMergeConflicts(old=>old.map(x=>x.id===conflict.id?{...x,first:now.state,revision:now.revision,choice:''}:x));throw new Error('Riešenie '+conflict.metadata.name+' medzitým upravil spolupracovník. Vyberte jeho verziu znova.');}throw e;}
-  }
-  setMergeConflicts([]);setMergeOpen(false);await open(pid);
- }catch(e){report(e);}finally{setBusy('');}}
- async function exportZip(){
-  if(!await save())return;setError('');
-  try{
-   setBusy('Pripravujem export na serveri…');const root='projects/'+project.id+'/export';
-   let job;
-   try{job=await api(root,{method:'POST'});}catch(e:any){if(e.status===501){await exportZipBrowser();return;}throw e;}
-   let failures=0;
-   while(job.status!=='ready'){
-    if(job.status==='error')throw new Error(job.error||'Export zlyhal. Skúste ho znova.');
-    setBusy(job.status==='queued'?'Export čaká na server…':job.stage==='loading'?'Server načítava archív…':job.stage==='packing'?`Server balí archív… ${job.percent}%`:`Server exportuje PDF… ${job.completed} / ${job.total}`);
-    await new Promise(resolve=>setTimeout(resolve,1000));
-    try{job=await api(root+'/'+job.id);failures=0;}catch(e:any){if(e.status||++failures>=5)throw e;setBusy('Obnovujem spojenie so serverom…');}
-   }
-   setBusy('Sťahujem hotový ZIP…');
-   const response=await fetch('/api/'+root+'/'+job.id+'/download');
-   if(!response.ok){const failure:any=await response.json().catch(()=>null);throw new Error(failure?.error||'ZIP sa nepodarilo stiahnuť. Spustite export znova.');}
-   download(await response.blob(),job.filename);
-  }catch(e:any){report(/fetch|network/i.test(e?.message??'')?'Spojenie sa prerušilo. Skúste export znova; hotový archív zostáva na serveri 30 minút.':e);}finally{setBusy('');}
- }
- async function exportZipBrowser(){setError('');
-  try{setBusy('Načítavam archív zo servera…');const pid=project.id;const fresh=await api('projects/'+pid);const JSZip=(await import('jszip')).default;
-   const res=await fetch('/api/projects/'+pid+'/archive');if(!res.ok)throw new Error('Najprv importujte ZIP archív.');const sourceZip=await JSZip.loadAsync(await res.arrayBuffer());const zip=new JSZip();
-   const {flattenPdf}=await import('@/lib/pdf-engine');await document.fonts.ready;const exportDocs=fresh.documents.filter((d:any)=>d.state.scoring?.points!=null);
-   for(let i=0;i<exportDocs.length;i++){
-    const d=exportDocs[i];setBusy(`Exportujem PDF… ${i+1} / ${exportDocs.length}`);
-    const original=await fetch(`/api/projects/${pid}/documents/${d.id}/file`);if(!original.ok)throw new Error('Pôvodné PDF sa nepodarilo načítať.');const originalBytes=new Uint8Array(await original.arrayBuffer());
-    const changed=d.state.changes.length||d.state.extraPages||Object.keys(d.state.rotations??{}).length;
-    const pdfName=d.path.split('/').pop()!;const out=changed?await flattenPdf(originalBytes,d.state):originalBytes;zip.file(pdfName,out);
-   }
-   const pointsFile=Object.values(sourceZip.files).find((x:any)=>!x.dir&&/(^|\/)points?\.json$/i.test(x.name.replace(/^\//,'')));let points:any={criteria:{},scores:{}};if(pointsFile){try{const old=JSON.parse(await pointsFile.async('string'));if(old&&typeof old==='object')points={...points,...old,scores:{}};}catch{}}
-   for(const d of exportDocs){const id=d.metadata.submissionId,s=d.state.scoring??{};const comments=(d.state.changes??[]).filter((c:any)=>c.type==='Text'&&c.data?.text&&c.data?.name!==s.annotName).map((c:any)=>c.data.text);points.scores[id]={acceptedCriteria:s.acceptedCriteria??[],final:s.final??true,points:s.points,comments:s.comments??(comments.length?[...comments,`${s.points}B`]:[`${s.points}B`])};}
-   zip.file('/points.json',JSON.stringify(points,null,2));setBusy('Balím archív…');download(await zip.generateAsync({type:'blob',compression:'STORE'}),exportName(fresh.folder?projectTitle(fresh.folder):fresh.title));
-  }catch(e){report(e);}finally{setBusy('');}
- }
- async function openSharing(){setSharing(!sharing);if(!sharing){try{setMembers(await api(`projects/${project.id}/members`));setLink(project.share?location.origin+'/?join='+project.share:'');}catch(e){report(e);}}}
- async function join(){try{setBusy('Pripájam projekt…');const token=new URLSearchParams(location.search).get('join');const p=await api('join',{method:'POST',body:JSON.stringify({token})});history.replaceState({},'','/');await list();await open(p.id);}catch(e){report(e);}finally{setBusy('');}}
- const hasJoin=typeof window!=='undefined'&&new URLSearchParams(window.location.search).has('join');
- const navigationDocuments=project?.documents.filter((d:any)=>`${d.metadata.name} ${d.metadata.submissionId} ${d.metadata.rocnik} ${categoryLabel(d.metadata.rocnik)}`.toLowerCase().includes(query.toLowerCase())&&(!categories.length||categories.includes(d.metadata.rocnik))&&(!tagFilter||d.state.tags.some((t:any)=>(typeof t==='object'?t.name:t)===tagFilter))).sort((a:any,b:any)=>(projectPreferences.sort==='graded'?Number(b.state.scoring?.points!=null)-Number(a.state.scoring?.points!=null):0)||a.metadata.name.localeCompare(b.metadata.name,'sk',{numeric:true})||Number(a.metadata.submissionId)-Number(b.metadata.submissionId))??[];
- const documents=navigationDocuments.filter((d:any)=>filter==='all'||(filter==='graded'?d.state.scoring?.points!=null:d.state.scoring?.points==null));
- const activeIndex=navigationDocuments.findIndex((d:any)=>d.id===active);const nextDocument=navigationDocuments.slice(Math.max(0,activeIndex+1)).find((d:any)=>documents.some((visible:any)=>visible.id===d.id));
- async function openNext(){if(nextDocument)await switchDoc(nextDocument.id);}
- const categoryOptions=Array.from(new Set<string>(project?.documents.map((d:any)=>d.metadata.rocnik)??[])).sort(compareCategories);
- const projectTags=collectTags(project?.legacy?.tags??[],...(project?.documents.map((d:any)=>d.state.tags??[])??[]));
- const allTags=projectTags.map(tagName);
- function toggleTag(value:any){if(!doc)return;const assigned=doc.state.tags.some((t:any)=>tagName(t)===tagName(value));changed({...doc.state,tags:assigned?doc.state.tags.filter((t:any)=>tagName(t)!==tagName(value)):[...doc.state.tags,value]});}
- return <main>
-  <header className="appheader"><a href="/" className="brand"><span className="brandmark"><PencilMark/></span>Opravovňa<span className="beta">PDF</span></a><div className="headerend"><span className="muted desktop">Priestor na dobrú spätnú väzbu</span>{isSignedIn?<><ToolSettings tools={preferences.tools} onSave={tools=>persistPreferences({tools})}/><UserButton/></>:<><SignInButton mode="modal"><button>Prihlásiť sa</button></SignInButton><SignUpButton mode="modal"><button className="primary">Vytvoriť účet</button></SignUpButton></>}</div></header>
-  {error&&<div role="alert" className="notice error"><span>{error}</span>{saveStatus==='Konflikt zmien'&&<><button onClick={()=>download(new Blob([JSON.stringify(current.current.doc.state,null,2)],{type:'application/json'}),'moje-neulozene-zmeny.json')}>Stiahnuť moje zmeny</button><button onClick={()=>{dirty.current=false;setError('');open(project.id);}}>Načítať serverovú verziu</button></>}<button aria-label="Zavrieť upozornenie" onClick={()=>setError('')}><X size={16}/></button></div>}
-  {mergeConflicts.length>0&&!mergeOpen&&<div className="notice progress"><span>{mergeConflicts.length} nevyriešených konfliktov pri importe.</span><button onClick={()=>setMergeOpen(true)}>Vyriešiť konflikty</button></div>}
-  {mergeOpen&&<dialog ref={mergeDialog} className="merge-dialog" aria-labelledby="merge-title" onCancel={()=>setMergeOpen(false)}><div className="shareheading"><h2 id="merge-title">Vyberte verzie riešení</h2><button aria-label="Zavrieť konflikty" onClick={()=>setMergeOpen(false)}><X size={18}/></button></div><p className="muted">Prvá verzia je uložená v projekte, druhá pochádza z nahraného archívu. Bezkonfliktné riešenia sú už zlúčené.</p>{error&&<div className="notice error" role="alert">{error}</div>}<div className="merge-actions"><button onClick={()=>setMergeConflicts(old=>old.map(x=>({...x,choice:'first'})))}>Všade prvá</button><button onClick={()=>setMergeConflicts(old=>old.map(x=>({...x,choice:'second'})))}>Všade druhá</button><span>{mergeConflicts.filter(x=>x.choice).length} / {mergeConflicts.length} vybraných</span></div><div className="conflicts">{mergeConflicts.map(c=><section className="conflict" key={c.id}><h3>{c.metadata.name} <small>{categoryLabel(c.metadata.rocnik)} · #{c.metadata.submissionId}</small></h3><div className="conflict-versions">{(['first','second'] as const).map(version=><label key={version} className={c.choice===version?'picked':''}><span className="version-heading"><input type="radio" name={'merge-'+c.id} value={version} checked={c.choice===version} onChange={()=>setMergeConflicts(old=>old.map(x=>x.id===c.id?{...x,choice:version}:x))}/>{version==='first'?'Prvá: v projekte':'Druhá: importovaná'}</span><VersionSummary state={c[version]} project={c.projectId} id={c.id}/></label>)}</div></section>)}</div><div className="merge-bottom"><button onClick={()=>setMergeOpen(false)}>Rozhodnúť neskôr</button><button className="primary" disabled={!!busy||mergeConflicts.some(x=>!x.choice)} onClick={resolveMerge}>Potvrdiť zlúčenie</button></div></dialog>}
-  {busy&&<div className="notice progress" role="status"><span className="pulse"/>{busy}</div>}
-  {!isLoaded?<div className="loading">Načítavam…</div>:!isSignedIn?<section className="welcome"><div className="eyebrow">PRE OPRAVOVATEĽOV</div><h1>Riešenia na jednom mieste.<br/>Spätná väzba priamo v PDF.</h1><p>Importujte ZIP, podeľte sa o opravovanie a odovzdajte hodnotené riešenia v pôvodnom formáte.</p><SignInButton mode="modal"><button className="primary large">Prihlásiť sa a začať <ArrowIcon/></button></SignInButton><div className="welcomefoot"><ShieldCheck size={18}/> Projekty dostupné len vám a vašim spolupracovníkom.</div></section>:!project?<section className="projects"><div className="sectionintro"><div><div className="eyebrow">PRACOVNÝ PRIESTOR</div><h1>Vaše projekty</h1><p className="muted">Každý archív má svoj priestor na spoločné opravovanie.</p></div><FolderOpen size={48} strokeWidth={1} className="muted"/></div>{hasJoin&&<div className="joinbox"><Users size={20}/><span>Dostali ste pozvanie do projektu.</span><button className="primary" onClick={join} disabled={!!busy}>Prijať pozvanie</button></div>}<form className="newproject" onSubmit={create}><Plus size={20}/><input aria-label="Názov nového projektu" placeholder="Názov nového projektu" value={newTitle} onChange={e=>setNewTitle(e.target.value)} maxLength={200}/><button className="primary" disabled={!!busy}>Vytvoriť projekt</button></form><div className="projectlist">{projects.length?projects.map(p=><button className="projectrow" key={p.id} onClick={()=>open(p.id)} disabled={!!busy}><span className="foldericon"><FolderOpen size={23}/></span><span><strong>{p.title}</strong><small>Vytvorené {new Date(p.created).toLocaleDateString('sk-SK')}</small></span><span className="rowend">Otvoriť <ArrowIcon/></span></button>):<div className="empty"><FileText size={32}/><h2>Začnite prvým projektom</h2><p>Vytvorte projekt a nahrajte archív riešení alebo opravený export.</p></div>}</div></section>:<>
-   <div className="projectbar"><button className="backbutton" onClick={async()=>{if(await save()){setProject(null);list().catch(report);}}} disabled={!!busy}><ChevronLeft size={18}/> Projekty</button><div className="projectname"><span className="eyebrow">PROJEKT</span><strong>{project.title}</strong></div><span className="sync" role="status"><span className={saveStatus==='Uložené'?'statusdot':'statusdot amber'}/>{saveStatus}</span><div className="projectactions"><button onClick={()=>save()} disabled={readonly||!!busy}><Save size={16}/><span className="desktop">Uložiť</span></button>{project.role==='owner'&&<button onClick={openSharing} disabled={!!busy}><Users size={16}/><span className="desktop">Zdieľať</span></button>}<button className="primary" onClick={exportZip} disabled={!!busy||!project.documents.length||mergeConflicts.length>0}><Download size={16}/> Exportovať ZIP</button></div></div>
-   {sharing&&<dialog ref={shareDialog} className="sharing" aria-labelledby="share-title" onCancel={()=>setSharing(false)} onClick={e=>{if(e.target===e.currentTarget){const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)setSharing(false);}}}><div className="shareheading"><h2 id="share-title">Zdieľanie projektu</h2><button aria-label="Zavrieť zdieľanie" onClick={()=>setSharing(false)}><X size={18}/></button></div><div><p className="muted">Používateľ sa prihlási cez Clerk rovnakým e-mailom. Pozvánky neposielame e-mailom.</p></div><form onSubmit={async e=>{e.preventDefault();try{await api(`projects/${project.id}/members`,{method:'POST',body:JSON.stringify({email,role:memberRole})});setEmail('');setMembers(await api(`projects/${project.id}/members`));}catch(e){report(e);}}}><input aria-label="E-mail spolupracovníka" type="email" required placeholder="kolega@example.sk" value={email} onChange={e=>setEmail(e.target.value)}/><select value={memberRole} onChange={e=>setMemberRole(e.target.value)} aria-label="Prístup"><option value="editor">Môže upravovať</option><option value="viewer">Môže čítať</option></select><button className="primary">Pridať</button></form><div className="memberlist">{members.map(m=><div key={m.id}><span>{m.email}</span><small>{m.role==='editor'?'Úpravy':'Čítanie'}</small><button aria-label={'Odobrať '+m.email} onClick={async()=>{try{await api(`projects/${project.id}/members`,{method:'DELETE',body:JSON.stringify({id:m.id})});setMembers(members.filter(x=>x.id!==m.id));}catch(e){report(e);}}}><X size={14}/></button></div>)}</div><div className="sharelink"><button onClick={async()=>{try{const r=await api(`projects/${project.id}/share`,{method:'POST',body:'{}'});setLink(location.origin+'/?join='+r.token);}catch(e){report(e);}}}><Link size={15}/> Vytvoriť odkaz pre opravovateľov</button>{link&&<><input readOnly aria-label="Odkaz na pripojenie" value={link} onFocus={e=>e.target.select()}/><button onClick={()=>navigator.clipboard.writeText(link).catch(report)}>Kopírovať</button><button onClick={async()=>{try{await api(`projects/${project.id}/share`,{method:'POST',body:'{"revoke":true}'});setLink('');}catch(e){report(e);}}}>Zrušiť odkaz</button></>}</div></dialog>}
-   <div className="workspace"><aside className="submissions"><div className="listheading"><h2>Riešenia <span>{project.documents.length}</span></h2>{!readonly&&<label className={'iconbutton '+(busy?'disabled':'')} title="Importovať ZIP"><Upload size={17}/><input type="file" accept=".zip" aria-label="Importovať ZIP" hidden disabled={!!busy} onChange={e=>{if(e.target.files?.[0])importZip(e.target.files[0]);e.target.value='';}}/></label>}</div><div className="search"><Search size={16}/><input aria-label="Hľadať riešenie" placeholder="Meno, ID alebo ročník…" value={query} onChange={e=>setQuery(e.target.value)}/></div><div className="filters"><select aria-label="Zoradiť riešenia" value={projectPreferences.sort} onChange={e=>setProjectPreferences({sort:e.target.value as 'name'|'graded'})}><option value="name">Abecedne</option><option value="graded">Opravené najprv</option></select><select aria-label="Filtrovať hodnotenie" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Všetky riešenia</option><option value="ungraded">Bez hodnotenia</option><option value="graded">Ohodnotené</option></select>{allTags.length>0&&<select aria-label="Filtrovať štítok" value={tagFilter} onChange={e=>setTagFilter(e.target.value)}><option value="">Všetky štítky</option>{allTags.map(t=><option key={t}>{t}</option>)}</select>}</div><details className="categoryfilter"><summary>Kategórie {categories.length?`(${categories.length})`:"(všetky)"}</summary><div>{categoryOptions.map(c=><label key={c}><input type="checkbox" checked={categories.includes(c)} onChange={e=>setCategories(e.target.checked?[...categories,c]:categories.filter(x=>x!==c))}/> {categoryLabel(c)}</label>)}{categories.length>0&&<button onClick={()=>setCategories([])}>Zobraziť všetky</button>}</div></details><div className="documentlist">{documents.map((d:any)=><button disabled={!!busy} key={d.id} className={'documentrow '+(active===d.id?'selected':'')} onClick={()=>switchDoc(d.id)}><Thumbnail project={project.id} id={d.id}/><span><strong>{d.metadata.name}</strong><small>{categoryLabel(d.metadata.rocnik)} · #{d.metadata.submissionId}</small>{d.state.tags.length>0&&<span className="documenttags">{d.state.tags.map((t:any,i:number)=><span className="tagchip" key={i} title={tagName(t)}>{tagName(t)}</span>)}</span>}</span><span className={'scorebadge '+(d.state.scoring?.points!=null?'scored':'')}>{d.state.scoring?.points??'–'}</span></button>)}{!documents.length&&<p className="listempty">{project.documents.length?'Žiadne riešenie nevyhovuje filtru.':'Nahrajte ZIP archív pomocou tlačidla vyššie.'}</p>}</div><div className="listfooter"><span><Check size={14}/>{project.documents.filter((d:any)=>d.state.scoring?.points!=null).length} / {project.documents.length} ohodnotených</span><button onClick={openNext} disabled={!!busy||!nextDocument} title={nextDocument?`Otvoriť: ${nextDocument.metadata.name}`:'Ďalšie riešenie nie je k dispozícii'}>Ďalšie <ChevronRight size={15}/></button></div></aside>
-   {doc?<><PdfEditor defaults={preferences.tools} key={doc.id} doc={doc} projectId={project.id} readonly={readonly||!!busy} onChange={changed} onError={report} register={a=>{editor.current=a;}}/><aside className="grading"><div className="eyebrow">HODNOTENIE</div><h2>{doc.metadata.name}</h2><dl><div><dt>Ročník / kód</dt><dd>{categoryLabel(doc.metadata.rocnik)}</dd></div><div><dt>Príklad</dt><dd>{doc.metadata.problem}</dd></div><div><dt>ID riešenia</dt><dd>{doc.metadata.submissionId}</dd></div></dl><div className="gradesection"><h3>Body</h3><ScoreInput key={doc.id} points={doc.state.scoring?.points} disabled={readonly||!!busy} onApply={applyGrade}/>{doc.state.scoring?.points!=null&&<><span className="gradedlabel"><Check size={14}/> {doc.state.scoring.points} z 5 bodov</span>{!readonly&&<button className="removegrade" disabled={!!busy} onClick={()=>editor.current?.removeScore()}>Zrušiť hodnotenie</button>}</>}</div><div className="gradesection"><h3><Tag size={15}/> Štítky</h3><div className="tags">{doc.state.tags.map((t:any,i:number)=><span key={i}>{typeof t==='object'?t.name:t}{!readonly&&<button aria-label="Odobrať štítok" onClick={()=>changed({...doc.state,tags:doc.state.tags.filter((_:any,j:number)=>i!==j)})}><X size={12}/></button>}</span>)}</div>{!readonly&&<>{projectTags.length>0&&<div className="projecttagpicker"><span className="muted">Štítky projektu</span><div className="tagchoices">{projectTags.map(t=><button type="button" key={tagName(t)} aria-pressed={doc.state.tags.some((v:any)=>tagName(v)===tagName(t))} onClick={()=>toggleTag(t)} disabled={!!busy}>{doc.state.tags.some((v:any)=>tagName(v)===tagName(t))?<Check size={12}/>:<Plus size={12}/>} {tagName(t)}</button>)}</div></div>}<form className="tagform" onSubmit={e=>{e.preventDefault();const name=tag.trim();if(name&&!doc.state.tags.some((t:any)=>tagName(t)===name))toggleTag(projectTags.find(t=>tagName(t)===name)??name);setTag('');}}><input aria-label="Nový štítok projektu" placeholder="Nový štítok projektu…" value={tag} maxLength={60} onChange={e=>setTag(e.target.value)} disabled={!!busy}/><button aria-label="Vytvoriť a priradiť štítok" disabled={!!busy||!tag.trim()}><Plus size={16}/></button></form></>}</div><div className="gradingfoot"><ShieldCheck size={17}/><p>{readonly?'Máte prístup iba na čítanie.':'Zmeny sa ukladajú automaticky. Ostatným sa zobrazia do 5 sekúnd.'}</p></div></aside></>:<div className="projectempty"><Upload size={40} strokeWidth={1.2}/><h2>Pripravte riešenia na opravovanie</h2><p>Nahrajte pôvodný ZIP alebo export s príponou _opravene.zip. Načítame mená, ročníky, body aj anotácie.</p>{!readonly&&<label className="button primary large">Vybrať ZIP archív<input type="file" accept=".zip" hidden aria-label="Vybrať ZIP archív" disabled={!!busy} onChange={e=>e.target.files?.[0]&&importZip(e.target.files[0])}/></label>}</div>}
-   </div></>}
- </main>;
-}
-function PencilMark(){return <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m5 16 11-11 3 3-11 11-4 1z"/><path d="m14 7 3 3"/></svg>;}
-function ArrowIcon(){return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>;}
-
-function ScoreInput({points,disabled,onApply}:{points?:number;disabled:boolean;onApply:(n:number)=>void}){const [draft,setDraft]=useState(points==null?'':String(points));useEffect(()=>setDraft(points==null?'':String(points)),[points]);return <form className="scoreform" onSubmit={e=>{e.preventDefault();const n=Number(draft.replace(',','.'));if(draft.trim()&&Number.isFinite(n)&&n>=0&&n<=5)onApply(n);}}><label htmlFor="score-input" className="sr-only">Počet bodov</label><input id="score-input" aria-label="Počet bodov" type="number" min="0" max="5" step="0.01" placeholder="0,00" value={draft} disabled={disabled} onChange={e=>setDraft(e.target.value)}/><span>/ 5</span><button disabled={disabled||!draft.trim()} className="primary" type="submit">Vložiť pečiatku</button></form>;}
-
-function VersionSummary({state,project,id}:{state:any;project:string;id:string}){const changes=state.changes??[];const texts=changes.filter((x:any)=>x.type==='Text'&&x.data?.name!==state.scoring?.annotName).map((x:any)=>x.data.text).filter(Boolean);return <div className="version-summary"><strong>{state.scoring?.points!=null?state.scoring.points+' bodov':'Bez hodnotenia'}</strong><span>{changes.length} anotácií · {state.extraPages??0} pridaných strán</span><span>Štítky: {state.tags?.map((x:any)=>typeof x==='object'?x.name:x).join(', ')||'žiadne'}</span>{texts.length?<p>{texts.join('\n\n')}</p>:<p className="muted">Bez textového komentára</p>}<SnapshotPreview state={state} project={project} id={id}/></div>;}
-
-function SnapshotPreview({state,project,id}:{state:any;project:string;id:string}){const [url,setUrl]=useState(''),[loading,setLoading]=useState(false),[failure,setFailure]=useState('');useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);return <div className="snapshot-preview"><button type="button" disabled={loading} onClick={async e=>{e.preventDefault();setLoading(true);setFailure('');try{const res=await fetch(`/api/projects/${project}/documents/${id}/file`);if(!res.ok)throw new Error('PDF sa nepodarilo načítať.');const {flattenPdf}=await import('@/lib/pdf-engine');const bytes=await flattenPdf(new Uint8Array(await res.arrayBuffer()),state);setUrl(URL.createObjectURL(new Blob([bytes as any],{type:'application/pdf'})));}catch(e:any){setFailure(e.message);}finally{setLoading(false);}}}>{loading?'Pripravujem náhľad…':url?'Obnoviť náhľad':'Zobraziť PDF'}</button>{failure&&<span role="alert">{failure}</span>}{url&&<><a href={url} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}>Otvoriť väčší náhľad</a><iframe title="Náhľad verzie riešenia" src={url}/></>}</div>;}

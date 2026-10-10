@@ -1,0 +1,251 @@
+.sharing {
+  padding: 20px 25px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.sharing p {
+  font-size: 12px;
+  margin: 5px 0 12px;
+}
+.sharing form {
+  display: flex;
+  gap: 8px;
+  max-width: 700px;
+}
+.sharing form input {
+  flex: 1;
+}
+.memberlist {
+  max-width: 700px;
+  margin-top: 10px;
+}
+.memberlist > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.memberlist small {
+  color: var(--muted);
+  margin-left: auto;
+}
+.memberlist button {
+  border: 0;
+  background: transparent;
+  min-height: 25px;
+  padding: 4px;
+}
+.sharelink {
+  display: flex;
+  gap: 7px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.sharelink input {
+  min-width: 220px;
+  flex: 1;
+  font-size: 12px;
+}
+.sharelink button {
+  font-size: 12px;
+}
+dialog.sharing {
+  color: var(--ink);
+  width: min(700px, calc(100vw - 30px));
+  max-height: 85dvh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 15px 70px oklch(20% 0.02 250/0.2);
+  background: var(--surface);
+}
+dialog.sharing::backdrop {
+  background: oklch(20% 0.02 250/0.45);
+}
+.shareheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.shareheading button {
+  border: 0;
+  background: transparent;
+  padding: 5px;
+}
+.sharing .sharelink {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+}
+.sharing p {
+  color: var(--muted);
+}
+dialog.sharing {
+  background: oklch(29% 0.019 245);
+  border-color: oklch(53% 0.028 245);
+}
+dialog.sharing::backdrop {
+  background: oklch(10% 0.015 245/0.7);
+}
+.shareheading h2 {
+  color: var(--accent);
+}
+.shareheading button {
+  color: var(--muted);
+}
+.sharing .sharelink {
+  border-color: var(--line);
+}
+.merge-dialog {
+  color: var(--ink);
+  background: var(--surface);
+  width: min(980px, calc(100vw - 24px));
+  max-height: 90dvh;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 24px;
+}
+.merge-dialog::backdrop {
+  background: oklch(10% 0.015 245/0.75);
+}
+.merge-dialog > p {
+  font-size: 12px;
+  max-width: 85ch;
+  margin-top: 6px;
+}
+.merge-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.merge-actions button {
+  font-size: 12px;
+}
+.merge-actions > span {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.conflicts {
+  max-height: 55dvh;
+  overflow: auto;
+  padding-right: 5px;
+}
+.conflict {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.conflict h3 {
+  display: block;
+  font-size: 15px;
+}
+.conflict h3 small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 10px;
+}
+.conflict-versions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+.conflict-versions > label {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 14px;
+  cursor: pointer;
+  background: var(--bg);
+}
+.conflict-versions > label.picked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.version-heading {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.version-heading input {
+  accent-color: var(--accent);
+}
+.version-summary {
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+}
+.version-summary > strong {
+  font-size: 18px;
+  color: var(--warm);
+}
+.version-summary > span {
+  color: var(--muted);
+}
+.version-summary p {
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow: auto;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.merge-bottom {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 20px;
+}
+.snapshot-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 8px;
+}
+.snapshot-preview button {
+  font-size: 11px;
+  align-self: flex-start;
+}
+.snapshot-preview a {
+  font-size: 11px;
+  color: var(--accent);
+}
+.snapshot-preview iframe {
+  width: 100%;
+  height: 280px;
+  border: 1px solid var(--line);
+  background: oklch(95% 0.004 245);
+}
+
+.import-score-list {
+  max-height: 55vh;
+  overflow: auto;
+  margin: 20px 0;
+}
+.import-score-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.import-score-row span {
+  flex: 1;
+  min-width: 0;
+}
+.import-score-row small {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.import-score-row input {
+  width: 110px;
+}

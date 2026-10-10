@@ -222,7 +222,7 @@ if (
   const result = await runNpmInstall(command, cacheSeed);
   process.exitCode = result.signal
     ? 128 + (osConstants.signals[result.signal] ?? 0)
-    : result.code ?? 1;
+    : (result.code ?? 1);
   if (result.signal) {
     try {
       process.kill(process.pid, result.signal);

@@ -45,6 +45,8 @@ next-env.d.ts
 !/build/sites-vite-plugin.LICENSE
 !/build/sites-vite-plugin.ts
 !/build/sites-worker.ts
+!/build/pdfjs-assets.mjs
+/public/pdfjs/
 
 /dist/
 /.wrangler/
@@ -60,3 +62,10 @@ next-env.d.ts
 wrangler.local.json
 .test-tmp/
 local-worker.mjs
+
+# Local runtime dependencies and private competition archives
+**/node_modules/
+*.zip
+*.pdf
+*.sqlite*
+*.db

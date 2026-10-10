@@ -1,139 +1,66 @@
-# Self-hosted test on r2d2
+# Docker deployment
 
-The image runs the compiled application on local workerd through a pinned
-Miniflare runtime. It does not run Wrangler's development server, watch files,
-or call hosted D1/R2. The live deployment uses Clerk's production instance for
-`opravovna.tech`, with Google OAuth and verified domain/email DNS.
+The image runs the compiled application on local workerd through Miniflare. D1 and R2 bindings persist to a local directory; hosted Cloudflare storage is not used by this runtime. A separate Node worker-thread pool generates exports.
 
-Build with the public Clerk key (never a secret key):
+## Build
+
+Supply your public Clerk key when building, and keep the secret key in an ignored runtime environment file.
 
 ```sh
-npx clerk env pull --instance prod --file .sites-runtime/clerk-production.env
-node --env-file=.sites-runtime/clerk-production.env scripts/build-container.mjs ghcr.io/yastrab1/opravovna:production
+node --env-file=.env.production scripts/build-container.mjs ghcr.io/yastrab1/opravovna:production
 docker push ghcr.io/yastrab1/opravovna:production
 ```
 
-On `r2d2`, `/home/r2d2/unified/personal-project.compose.yml` is included by
-both `docker-compose.yml` and `docker-compose.apps.yml`. The app is a service in
-the existing `apps` Compose project. Operate only its services:
+Configure `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `APP_ORIGIN` in the runtime environment. The public origin must match your Clerk production domain. Clerk's Google sign-in needs your own OAuth credentials, configured in Clerk and Google Cloud.
+
+Use [personal-project.compose.yml](personal-project.compose.yml) as a template for the app and Cloudflare Tunnel. Mount the tunnel configuration and tunnel-specific credentials, rather than the account-wide Cloudflare certificate. Persistent storage must be writable by UID/GID 1000.
+
+Pin a tested image digest for deployment. Keep the previous digest for rollback. The self-hosted Workers compatibility date is pinned to `2026-05-15` so build-tool updates cannot silently exceed the runtime binary's supported date. Only override `WORKER_COMPATIBILITY_DATE` after testing an updated runtime.
+
+## Existing unified stack
+
+The live instance uses `/home/r2d2/unified/personal-project.compose.yml`, included by the unified `apps` stack. Update only the Opravovna service:
 
 ```sh
 cd /home/r2d2/unified
-docker compose -f docker-compose.apps.yml -f docker-compose.config-api.yml up -d opravovna opravovna-tunnel
-docker compose -f docker-compose.apps.yml -f docker-compose.config-api.yml logs --tail=50 opravovna opravovna-tunnel
+docker compose -f docker-compose.apps.yml -f docker-compose.config-api.yml up -d --no-deps opravovna
+docker compose -f docker-compose.apps.yml -f docker-compose.config-api.yml logs --tail=50 opravovna
 curl -f http://127.0.0.1:8791/healthz
 ```
 
-The deployment pins the application image digest. The checked-in template uses
-the `production` tag for initial setup; replace it with the digest when deploying.
-Updates require building/pushing a new image, changing the image digest in the
-personal Compose file, and running `up -d` for these two services.
+The tunnel forwards to `http://opravovna:8787` on the private Compose network. The app's published port is bound to server loopback. `APP_ORIGIN` restores the public HTTPS origin before Clerk and same-origin checks inspect requests.
 
-## Files on the server
+Only one app instance should write to a given data directory. Do not run a second tunnel pointing to an independent writable copy of the database for the same hostname.
 
-- `data/opravovna/`: persistent local database and PDF/archive blobs. This is
-  the contents of the original `.wrangler/state/v3`, not its parent directory.
-- `secrets/opravovna.env`: runtime `CLERK_SECRET_KEY` and
-  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (mode 600).
-- `secrets/opravovna-tunnel/credentials.json`: tunnel-specific credentials.
-  The account-wide `cert.pem` is not needed and is not copied.
-- `secrets/opravovna-tunnel/config.yml`: existing tunnel ID, public hostname,
-  and origin `http://opravovna:8787` on the private Compose network.
-- `backups/opravovna/`: pre-migration snapshots and configuration backups.
+## Persistent files and backups
 
-The containers run as UID/GID 1000. The bind-mounted data and secret files must
-be readable by this identity. The HTTP port is published only on server
-loopback; public traffic arrives through Cloudflare Tunnel. `APP_ORIGIN` restores
-the HTTPS public origin before Clerk and same-origin validation handle requests.
+- `data/opravovna/`: database and PDF/archive blobs. For an existing Wrangler migration, use the contents of `.wrangler/state/v3`, preserving binding IDs.
+- `secrets/opravovna.env`: runtime Clerk keys, readable only by the service account.
+- `secrets/opravovna-tunnel/`: tunnel-specific credentials and ingress configuration.
+- `backups/opravovna/`: protected snapshots kept outside the repository.
 
-Never start the laptop tunnel and server tunnel together while they point at
-independent writable database copies. Cloudflare can send requests to either
-connector. Keep the old laptop services disabled after cutover.
+Stop the app before copying the complete data directory to obtain a consistent snapshot of SQLite WAL files and blob metadata. Back up secrets separately. Restore the entire snapshot with UID/GID 1000 ownership, then start the app. Keep database, keys and image compatible when rolling back an authentication migration.
 
-## Backup and restore
+Schema migrations under `drizzle/` run once at startup. Existing initial schemas are recognized. `/healthz` becomes ready after migration and checks database access; it does not test Clerk availability.
 
-Stop the two Opravovna services before copying the data directory to get a
-consistent snapshot of SQLite WAL files and blob metadata. Keep secrets in a
-separate protected backup. To restore, stop the same services, restore the entire
-data snapshot with UID/GID 1000 ownership, then restart them. Keep one running
-application instance per data directory.
+`migrate-clerk-owners.py` is an optional one-time tool for mapping development account IDs to production IDs. It needs a private JSON mapping and a stopped, backed-up database. The regular deployment path does not run it.
 
-Container restarts automatically preserve data. Initial schema creation and
-future checked-in SQL migrations run at startup. The imported initial schema
-is recognized and is not recreated. The health check verifies database
-availability after migrations; it does not validate external Clerk availability.
+## Export capacity
 
-The old workers.dev test has its own remote D1/R2 data. It is not the source of
-this laptop-to-r2d2 migration and is left intact.
+Set `EXPORT_WORKERS` to 1–16; the live r2d2 stack uses 12. Each thread owns its native renderer and font registry. PDF rendering runs in parallel; one archive packs at a time, with up to three further jobs queued. Original PDF basenames and the root `/points.json` entry match the Arnold interchange contract. Annotations are flattened into the exported PDFs.
 
-## Production authentication cutover
+Native Skia renders embedded images and bundled fonts. External annotation image URLs are rejected before hydration. Unchanged PDFs skip canvas rendering. Temporary ZIPs expire after 30 minutes or a process restart; at most eight finished jobs are retained. Identical snapshots reuse an existing job. Status and downloads require the initiating account and current project access.
 
-The production Clerk instance is `ins_3KVT9YhcVblXiwbLYqX3gqTqFYp` in the same
-Opravovna application. Google OAuth credentials are stored in Clerk, not in the
-container. Production Clerk API keys are runtime secrets; only the publishable
-key is supplied at image build time. Local development continues to use its
-separate development keys.
+The browser polls progress and downloads the result. Generation continues if that browser disconnects. Runtimes without the internal `EXPORTER` binding use the browser fallback.
 
-The runtime image installs `ca-certificates`: workerd uses the OS trust store
-when fetching Clerk signing keys and user records. Node's built-in certificates
-alone are insufficient. Keep TLS certificate verification enabled.
+## Validation
 
-To check real authentication, run `node tests/container-auth.mjs` with
-`CLERK_SECRET_KEY`, an active `CLERK_TEST_SESSION_ID`, and `TEST_URL` supplied
-through a protected environment. This verifies cookie and bearer authentication,
-rejects anonymous/invalid sessions, and checks project request validation without
-creating data. Set `TEST_CREATE=1` only against an isolated localhost container
-with a disposable data copy to also verify project creation. Session tokens and
-account details are never printed. This optional check is separate from the
-regular API suite, which mocks identity.
+```sh
+npm test
+npm run test:export
+npm audit --prefix deploy/runtime --omit=dev
+```
 
-Clerk development sessions and user IDs do not carry over. A replacement
-production account was provisioned with the existing verified email, and its
-account preferences were copied. The application's project owners and upload
-owners were remapped to the production account ID, preserving all PDF and
-annotation records. Existing memberships remain keyed by email. Users must sign
-in again on the production domain.
+Rendering checks require Poppler. Optional real-authentication smoke tests use `tests/container-auth.mjs` with `CLERK_SECRET_KEY`, an active `CLERK_TEST_SESSION_ID`, and `TEST_URL` passed through a protected environment. They verify cookie/bearer authentication and request validation without creating production data. `TEST_CREATE=1` is restricted to an isolated localhost container.
 
-`migrate-clerk-owners.py` previews or applies this one-time ID remapping using a
-private JSON map. Stop the application and take a database backup before using
-`--apply`; the script checks for unmapped owners and preserves document rows.
-The server retains the private map in `secrets/opravovna-account-map.json` and a
-pre-cutover database, environment and Compose snapshot under
-`backups/opravovna/before-clerk-production-*`. Restore the database, keys and
-image together when rolling this authentication cutover back.
-
-## Parallel server exports
-
-The self-hosted runtime provides an internal `EXPORTER` binding. Protected API
-routes take a saved project snapshot, then a Node worker-thread pool renders the
-annotated PDFs with the same annotation conversion and PDF placement code as
-the browser editor. Flattened PDFs use the original submission basename plus
-`_graded.pdf` so reviewers can match each annotation to its source by name.
-The importer also accepts older ID-only names such as `41608_graded.pdf`.
-Original PDFs, MessagePack metadata, the Opravovna sidecar,
-attachments and the `_opravene.zip` naming contract are preserved. Native Skia
-renders embedded images and bundled fonts; annotation images cannot fetch URLs
-from the server. Pages without annotations skip canvas rendering.
-
-Set `EXPORT_WORKERS` to tune parallelism (1–16). The r2d2 Compose configuration
-uses 12 threads. One archive generates at a time, with up to three more queued,
-so simultaneous users cannot multiply the thread pool and memory usage. R2
-files are consumed as streams rather than through large proxy RPC results.
-The browser polls progress, then downloads the finished ZIP. Generation does
-not depend on an open browser connection. Identical snapshots reuse a finished
-archive for 30 minutes, and the most recent eight finished jobs are retained.
-Job status and downloads require both the creating account and current project
-access. Temporary archives are deleted on expiration or process restart;
-database and PDF storage are unchanged. Hosts without the binding retain the
-browser export fallback.
-
-`npm run test:export` checks threaded export, the interchange schema, original
-bytes, decimal grades, rotation, extra pages, image rendering, job isolation,
-cached retries and rejection of remote image URLs. It requires Poppler's
-`pdftoppm` for an actual rendered-image assertion. `tests/container-auth.mjs`
-checks real-session authentication separately.
-
-Project tag names are retained in the existing `legacy.tags` vocabulary when a
-document is saved. SQLite appends missing tags in the same transaction as the
-document revision update, preserving concurrent reviewer changes. Removing an
-assignment keeps the project tag available for other solutions and exports.
+The container installs OS CA certificates for workerd's Clerk requests. Keep TLS verification enabled. Health checks alone do not verify authenticated routes; check real sign-in before switching a production image.

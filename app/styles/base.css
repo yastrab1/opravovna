@@ -1,0 +1,304 @@
+:root {
+  --bg: oklch(98% 0.005 250);
+  --surface: oklch(99.5% 0.003 250);
+  --panel: oklch(96.5% 0.006 250);
+  --ink: oklch(25% 0.025 255);
+  --muted: oklch(51% 0.02 255);
+  --line: oklch(88% 0.01 250);
+  --accent: oklch(47% 0.15 260);
+  --accent-soft: oklch(94% 0.028 260);
+  --good: oklch(44% 0.1 155);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    14px/1.5 "Ubuntu",
+    system-ui,
+    sans-serif;
+}
+:where(button, input, select):not([class*="cl-"]) {
+  font: inherit;
+  color: inherit;
+}
+button:not([class*="cl-"]),
+.button,
+.iconbutton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px 11px;
+  background: var(--surface);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+button:not([class*="cl-"]):hover,
+.button:hover,
+.iconbutton:hover {
+  background: var(--panel);
+}
+button:not([class*="cl-"]):disabled,
+.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible,
+.iconbutton:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+:where(input, select):not([class*="cl-"]) {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 7px 9px;
+  min-width: 0;
+}
+input::placeholder {
+  color: var(--muted);
+}
+button.primary,
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: oklch(99% 0.003 250);
+}
+button.primary:hover,
+.button.primary:hover {
+  background: oklch(40% 0.15 260);
+}
+button.large,
+.button.large {
+  padding: 12px 20px;
+  min-height: 46px;
+}
+.muted {
+  color: var(--muted);
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.8px;
+}
+h2 {
+  font-size: 17px;
+  line-height: 1.35;
+}
+h3 {
+  font-size: 14px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+p {
+  max-width: 65ch;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.appheader {
+  height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 25px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 19px;
+  text-decoration: none;
+  letter-spacing: -0.4px;
+}
+.brandmark {
+  background: var(--accent);
+  color: var(--surface);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+}
+.beta {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+.headerend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.headerend .muted {
+  font-size: 12px;
+}
+.notice {
+  padding: 10px 22px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.notice > span:first-child {
+  flex: 1;
+}
+.notice.error {
+  background: oklch(95% 0.04 25);
+  color: oklch(38% 0.12 25);
+  border-bottom: 1px solid oklch(84% 0.06 25);
+}
+.notice.progress {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.notice .pulse {
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  border-radius: 50%;
+  flex: none !important;
+  animation: pulse 1s ease-in-out infinite;
+}
+.notice button {
+  font-size: 12px;
+}
+.iconbutton {
+  padding: 7px;
+  min-width: 32px;
+}
+.scorebadge {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.scorebadge.scored {
+  background: oklch(94% 0.03 155);
+  color: var(--good);
+  border-color: oklch(87% 0.04 155);
+  font-weight: 700;
+}
+.points {
+  display: flex;
+  gap: 5px;
+}
+.points button {
+  padding: 0;
+  width: 32px;
+  height: 36px;
+  font-weight: 600;
+}
+.points .chosen {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+}
+.loading {
+  padding: 50px;
+  color: var(--muted);
+  text-align: center;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Dark grading desk, inspired by the user's working editor. */
+:root {
+  color-scheme: dark;
+  --bg: oklch(24% 0.015 250);
+  --surface: oklch(27% 0.016 250);
+  --panel: oklch(32% 0.018 250);
+  --ink: oklch(94% 0.009 240);
+  --muted: oklch(73% 0.017 240);
+  --line: oklch(43% 0.018 250);
+  --accent: oklch(75% 0.145 222);
+  --accent-soft: oklch(36% 0.065 230);
+  --good: oklch(80% 0.16 130);
+  --warm: oklch(77% 0.17 65);
+}
+body {
+  background: var(--bg);
+}
+.appheader {
+  background: oklch(17% 0.014 265);
+  border-bottom-color: oklch(37% 0.03 265);
+}
+.brandmark {
+  background: var(--warm);
+  color: oklch(20% 0.02 65);
+  border-radius: 50%;
+}
+.brand {
+  letter-spacing: -0.5px;
+}
+.beta {
+  background: oklch(25% 0.035 265);
+  color: var(--accent);
+  border-color: oklch(43% 0.05 265);
+}
+button.primary,
+.button.primary {
+  color: oklch(19% 0.035 235);
+  font-weight: 600;
+}
+.primary:hover {
+  background: oklch(81% 0.13 222) !important;
+}
+.notice.error {
+  background: oklch(35% 0.09 25);
+  color: oklch(94% 0.03 25);
+  border-color: oklch(51% 0.1 25);
+}
+.notice.progress {
+  background: oklch(32% 0.06 230);
+  color: var(--accent);
+}

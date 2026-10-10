@@ -1,0 +1,166 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: oklch(91% 0.009 250);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.toolgroup {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-right: 7px;
+  border-right: 1px solid var(--line);
+}
+.toolgroup:last-child {
+  border: 0;
+}
+.toolbar button,
+.toolbar .iconbutton {
+  border-color: transparent;
+  min-width: 30px;
+  min-height: 31px;
+  padding: 6px;
+}
+.toolbar button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: oklch(82% 0.05 260);
+}
+.toolbar select {
+  font-size: 11px;
+  padding: 4px;
+  max-width: 112px;
+  height: 30px;
+}
+.toolbar input[type="color"] {
+  padding: 3px;
+  width: 29px;
+  height: 29px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.toolbar .number {
+  width: 47px;
+  height: 29px;
+  font-size: 12px;
+  padding: 4px;
+}
+.pagebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  border-bottom: 1px solid oklch(85% 0.012 250);
+  background: var(--panel);
+  font-size: 11px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pagebar > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pagebar button {
+  font-size: 11px;
+  min-height: 26px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+}
+.pagebar span {
+  min-width: 60px;
+  text-align: center;
+}
+.paperwell {
+  overflow: auto;
+  flex: 1;
+  padding: 28px;
+  position: relative;
+}
+.paperbounds {
+  position: relative;
+  margin: 0 auto 30px;
+  flex-shrink: 0;
+}
+.paper {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+  box-shadow: 0 2px 14px oklch(25% 0.02 250/0.16);
+  background: var(--surface);
+}
+.paper > canvas {
+  position: absolute;
+  inset: 0;
+}
+.annotation {
+  position: absolute;
+  inset: 0;
+}
+.editor {
+  background: oklch(27% 0.013 245);
+}
+.toolbar {
+  background: oklch(34% 0.017 245);
+  border-bottom-color: oklch(23% 0.015 245);
+  padding: 9px 10px;
+}
+.toolbar button,
+.toolbar .iconbutton {
+  color: var(--accent);
+  border: 1px solid oklch(63% 0.11 220);
+  border-radius: 4px;
+  background: oklch(32% 0.018 245);
+}
+.toolbar button:hover {
+  background: oklch(42% 0.06 230);
+}
+.toolbar button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: oklch(20% 0.025 235);
+}
+.toolbar select,
+.toolbar .number {
+  background: oklch(43% 0.016 245);
+  color: var(--ink);
+  border-color: oklch(56% 0.02 245);
+}
+.toolgroup {
+  border-color: oklch(49% 0.02 245);
+}
+.pagebar {
+  background: oklch(30% 0.016 245);
+  border-color: oklch(23% 0.015 245);
+  color: oklch(80% 0.015 245);
+}
+.pagebar button {
+  color: oklch(82% 0.025 235);
+}
+.pagebar button:hover {
+  background: oklch(40% 0.02 245);
+}
+.paperwell {
+  background: oklch(27% 0.013 245);
+}
+.paper {
+  box-shadow: 0 3px 24px oklch(12% 0.01 245/0.45);
+  background: oklch(99% 0.002 245);
+}
+.toolbar button[aria-pressed="true"] {
+  background: var(--accent);
+  color: oklch(20% 0.025 235);
+}

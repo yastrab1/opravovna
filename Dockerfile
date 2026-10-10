@@ -21,7 +21,7 @@ RUN npm ci --omit=dev --no-audit --no-fund && mkdir /data && chown node:node /da
 COPY --from=build /app/dist ./dist
 COPY drizzle ./drizzle
 COPY deploy/runtime/server.mjs ./server.mjs
-COPY deploy/runtime/exporter.mjs deploy/runtime/pdf-worker.mjs ./
+COPY deploy/runtime/canvas-environment.mjs deploy/runtime/exporter.mjs deploy/runtime/pdf-worker.mjs deploy/runtime/render-pool.mjs deploy/runtime/generate-archive.mjs ./
 COPY --from=build /app/public/fonts ./public/fonts
 COPY deploy/runtime/entry.mjs ./dist/server/container-entry.mjs
 USER node

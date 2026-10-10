@@ -16,3 +16,7 @@ wrangler.local.json
 *.tar
 *.tar.gz
 **/__pycache__
+
+**/node_modules
+*.zip
+*.pdf

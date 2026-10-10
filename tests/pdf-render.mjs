@@ -1,21 +1,182 @@
-import fs from 'node:fs/promises';import path from 'node:path';import ts from 'typescript';import {createCanvas,GlobalFonts,DOMMatrix,ImageData,Path2D} from '@napi-rs/canvas';import {createRequire} from 'node:module';import * as napi from '@napi-rs/canvas';const require=createRequire(import.meta.url);require.cache[require.resolve('canvas')]={exports:napi};const fabric=await import('fabric/node');import utils from 'jsdom/lib/jsdom/living/generated/utils.js';const {implForWrapper}=utils;import JSZip from 'jszip';import {unpack} from 'msgpackr';import {PDFDocument} from 'pdf-lib';import assert from 'node:assert/strict';
-Promise.try??=(fn,...args)=>new Promise(resolve=>resolve(fn(...args)));
-globalThis.DOMMatrix=DOMMatrix;globalThis.ImageData=ImageData;globalThis.Path2D=Path2D;
-const env=fabric.getEnv(),proto=env.window.HTMLCanvasElement.prototype;
-proto.getContext=function(type){const impl=implForWrapper(this);let c=impl._canvas;if(!c)c=impl._canvas=createCanvas(this.width||300,this.height||150);if(c.width!==this.width)c.width=this.width;if(c.height!==this.height)c.height=this.height;const ctx=c.getContext(type);if(!ctx.__patched){const draw=ctx.drawImage.bind(ctx);ctx.drawImage=(image,...args)=>draw(image?.getContext?implForWrapper(image)?._canvas??image:image,...args);ctx.__patched=true;}return ctx;};
-proto.toDataURL=function(...args){this.getContext('2d');return implForWrapper(this)._canvas.toDataURL(...args);};
-for(const [i,family] of [[0,'Gloria Hallelujah'],[1,'Open Sans'],[3,'Ubuntu'],[4,'Ubuntu'],[5,'Ubuntu']])GlobalFonts.registerFromPath(path.resolve(`public/fonts/font-${i}.ttf`),family);
-globalThis.document=env.document;globalThis.window=env.window;
-let source=await fs.readFile('lib/pdf-engine.ts','utf8');source=source.replace("import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';",`const workerUrl=${JSON.stringify(path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs'))};`);source=source.replaceAll("import('fabric')","import('fabric/node')").replace("'/pdf.worker.min.mjs'",JSON.stringify(path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs')));
-for(const file of ['pdf-annotations','pdf-render'])await fs.writeFile(`.test-tmp/${file}.mjs`,ts.transpileModule(await fs.readFile(`lib/${file}.ts`,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
-source=source.replaceAll("'./pdf-annotations'","'./pdf-annotations.mjs'").replaceAll("'./pdf-render'","'./pdf-render.mjs'");
-await fs.writeFile('.test-tmp/pdf-engine.mjs',ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
-const {flattenPdf,loadObjects,fabricToLegacy}=await import('../.test-tmp/pdf-engine.mjs');
-const zip=await JSZip.loadAsync(await fs.readFile('../4. Kto druhemu jamu kope sam do nej spadne_opravene.zip'));const legacy=unpack(await zip.file('changes.arn').async('uint8array'));const filename=Object.keys(zip.files).find(x=>x.endsWith('-41572.pdf'));const state={...legacy.changes['41572'],rotations:{},extraPages:0};
-for(const entry of Object.values(legacy.changes)){const check=new fabric.StaticCanvas(undefined,{width:595,height:842,enableRetinaScaling:false});await loadObjects(check,entry.changes,0);await check.dispose();}
-const canvas=new fabric.StaticCanvas(undefined,{width:595.28,height:841.89,enableRetinaScaling:false});await loadObjects(canvas,state.changes,0);canvas.renderAll();assert.equal(canvas.getObjects().length,state.changes.length);const restored=canvas.getObjects().map(o=>fabricToLegacy(o,0));assert.equal(restored.filter(x=>x.type==='Text').length,2);assert.equal(restored.find(x=>x.data.text==='4B').data.name,state.scoring.annotName);assert.ok(restored.filter(x=>x.type==='Path').every(x=>typeof x.data.path==='string'));
-await fs.mkdir('.test-tmp/pdf',{recursive:true});await fs.writeFile('.test-tmp/pdf/annotation-layer.png',implForWrapper(canvas.lowerCanvasEl)._canvas.toBuffer('image/png'));
-const bytes=await zip.file(filename).async('uint8array');const output=await flattenPdf(bytes,state);await fs.writeFile('.test-tmp/pdf/legacy-flattened.pdf',output);
-const sourcePdf=await PDFDocument.load(bytes),flat=await PDFDocument.load(output);assert.equal(flat.getPageCount(),sourcePdf.getPageCount());
-const extended=await flattenPdf(bytes,{...state,rotations:{0:90},extraPages:1});const check=await PDFDocument.load(extended);assert.equal(check.getPageCount(),sourcePdf.getPageCount()+1);assert.equal(check.getPage(0).getRotation().angle,90);
-console.log('PASS: legacy text/path hydration, annotation identity, PDF flattening, rotation and appended page');await canvas.dispose();
+import fs from "node:fs/promises";
+import path from "node:path";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { PDFDocument, rgb } from "pdf-lib";
+import {
+  createCanvas,
+  loadImage,
+  DOMMatrix,
+  ImageData,
+  Path2D,
+} from "@napi-rs/canvas";
+import { prepareExportRuntime, renderWithWorker } from "./support/runtime.mjs";
+
+Object.assign(globalThis, { DOMMatrix, ImageData, Path2D });
+const root = await prepareExportRuntime("pdf-runtime");
+const { extractScan, drawRotatedScan, scanLayout } = await import(
+  path.join(root, "dist/export/pdf-scan.mjs")
+);
+const js = await import("pdfjs-dist/legacy/build/pdf.mjs");
+const source = await PDFDocument.create(),
+  page = source.addPage([600, 800]);
+const scanCanvas = createCanvas(200, 300),
+  ctx = scanCanvas.getContext("2d");
+ctx.fillStyle = "#00b8da";
+ctx.fillRect(0, 0, 200, 300);
+ctx.fillStyle = "#0000ff";
+ctx.fillRect(0, 0, 30, 30);
+const scanImage = await source.embedPng(scanCanvas.toBuffer("image/png"));
+page.drawImage(scanImage, { x: 100, y: 70, width: 400, height: 600 });
+page.drawText("NAME CATEGORY", {
+  x: 10,
+  y: 780,
+  size: 12,
+  color: rgb(0, 0, 0),
+});
+// A surrounding PDF border is not part of the embedded scan.
+page.drawRectangle({
+  x: 99,
+  y: 69,
+  width: 402,
+  height: 602,
+  borderColor: rgb(1, 0, 0),
+  borderWidth: 2,
+});
+const bytes = await source.save();
+await fs.writeFile(path.join(root, "source.pdf"), bytes);
+const loadingTask = js.getDocument({
+  data: bytes.slice(),
+  isEvalSupported: false,
+});
+const parsed = await loadingTask.promise;
+try {
+  const inputPage = await parsed.getPage(1),
+    scan = await extractScan(inputPage, js, createCanvas);
+  assert(scan);
+  assert.equal(scan.canvas.width, 200);
+  assert.equal(scan.canvas.height, 300);
+  function colorBounds(canvas, color, pixelRatio = 1) {
+    const { data } = canvas
+      .getContext("2d")
+      .getImageData(0, 0, canvas.width, canvas.height);
+    let left = Infinity,
+      top = Infinity,
+      right = -1,
+      bottom = -1;
+    for (let y = 0; y < canvas.height; y++)
+      for (let x = 0; x < canvas.width; x++) {
+        const i = (y * canvas.width + x) * 4;
+        if (color(data[i], data[i + 1], data[i + 2])) {
+          left = Math.min(left, x);
+          top = Math.min(top, y);
+          right = Math.max(right, x);
+          bottom = Math.max(bottom, y);
+        }
+      }
+    assert(right >= left, "Expected visible scan pixels");
+    return {
+      left: left / pixelRatio,
+      top: top / pixelRatio,
+      right: right / pixelRatio,
+      bottom: bottom / pixelRatio,
+    };
+  }
+  const cyan = (r, g, b) => r < 60 && g > 130 && b > 150;
+  for (const turn of [90, 180, 270]) {
+    const state = {
+      changes: [],
+      tags: [],
+      scoring: {},
+      rotations: { 0: turn },
+      extraPages: 1,
+    };
+    const output = await renderWithWorker(root, bytes.slice(), state);
+    const pdf = await PDFDocument.load(output);
+    assert.equal(pdf.getPageCount(), 2);
+    assert.equal(
+      pdf.getPage(0).getRotation().angle,
+      0,
+      "Page and header stay upright",
+    );
+    const filename = path.join(root, "rotated-" + turn);
+    await fs.writeFile(filename + ".pdf", output);
+    assert.match(
+      execFileSync("pdftotext", [filename + ".pdf", "-"], { encoding: "utf8" }),
+      /NAME CATEGORY/,
+    );
+    execFileSync("pdftoppm", [
+      "-f",
+      "1",
+      "-singlefile",
+      "-scale-to",
+      "800",
+      "-png",
+      filename + ".pdf",
+      filename,
+    ]);
+    const image = await loadImage(filename + ".png"),
+      canvas = createCanvas(image.width, image.height);
+    canvas.getContext("2d").drawImage(image, 0, 0);
+    const actual = colorBounds(canvas, cyan),
+      layout = scanLayout(600, 800, scan, turn);
+    const expectedWidth = turn % 180 ? layout.height : layout.width,
+      expectedHeight = turn % 180 ? layout.width : layout.height;
+    assert(
+      Math.abs((actual.left + actual.right) / 2 - layout.centerX) < 2,
+      "Export is centered horizontally",
+    );
+    assert(
+      Math.abs((actual.top + actual.bottom) / 2 - layout.centerY) < 2,
+      "Export is centered below header",
+    );
+    assert(
+      Math.abs(actual.right - actual.left + 1 - expectedWidth) < 3,
+      "Only scan dimensions determine fit",
+    );
+    assert(Math.abs(actual.bottom - actual.top + 1 - expectedHeight) < 3);
+    const preview = createCanvas(1200, 1600);
+    preview.getContext("2d").fillStyle = "#fff";
+    preview.getContext("2d").fillRect(0, 0, 1200, 1600);
+    drawRotatedScan(preview.getContext("2d"), scan, 600, 800, turn, 2);
+    const previewBounds = colorBounds(preview, cyan, 2);
+    for (const key of Object.keys(actual))
+      assert(
+        Math.abs(actual[key] - previewBounds[key]) < 2,
+        "Preview matches export at high DPI",
+      );
+    // Cyan scan must contain no red PDF border, and clockwise orientation agrees.
+    const blue = (r, g, b) => r < 70 && g < 70 && b > 180;
+    const blueExport = colorBounds(canvas, blue),
+      bluePreview = colorBounds(preview, blue, 2);
+    assert(Math.abs(blueExport.left - bluePreview.left) < 2);
+    assert(Math.abs(blueExport.top - bluePreview.top) < 2);
+  }
+  const { legacyToFabric, fabricToLegacy } = await import(
+    path.join(root, "dist/export/pdf-annotations.mjs")
+  );
+  assert.equal(
+    legacyToFabric({ type: "Text", data: { text: "4.67B" } }).originX,
+    "left",
+  );
+  assert.equal(
+    fabricToLegacy(
+      { type: "rect", toObject: () => ({ width: 10, height: 20 }) },
+      0,
+    ).type,
+    "Path",
+  );
+  const plain = await renderWithWorker(root, bytes.slice(), {
+    changes: [],
+    tags: [],
+    scoring: {},
+    rotations: {},
+    extraPages: 0,
+  });
+  assert.equal((await PDFDocument.load(plain)).getPageCount(), 1);
+  console.log(
+    "PASS: embedded-image bounds, upright header, centered maximum fit, clockwise rotation and preview/export parity at 90/180/270 degrees; annotations and extra page",
+  );
+} finally {
+  await loadingTask.destroy();
+}

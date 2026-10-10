@@ -1,0 +1,196 @@
+.grading {
+  padding: 24px 20px;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.grading h2 {
+  font-size: 18px;
+  margin: 10px 0 20px;
+}
+.grading dl {
+  margin: 0;
+  font-size: 11px;
+}
+.grading dl > div {
+  display: flex;
+  justify-content: space-between;
+  margin: 7px 0;
+  gap: 10px;
+}
+.grading dt {
+  color: var(--muted);
+}
+.grading dd {
+  margin: 0;
+}
+.gradesection {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 22px;
+}
+.gradesection p {
+  font-size: 11px;
+  margin: 8px 0 12px;
+}
+.gradedlabel {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--good);
+  font-size: 11px;
+  margin-top: 10px;
+}
+.tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.tags > span {
+  font-size: 11px;
+  background: var(--panel);
+  padding: 3px 5px 3px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tags button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-height: 18px;
+}
+.tagform {
+  display: flex;
+  margin-top: 10px;
+  gap: 4px;
+}
+.tagform input {
+  width: 100%;
+  font-size: 11px;
+}
+.tagform button {
+  padding: 5px;
+}
+.gradingfoot {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: auto;
+  padding-top: 35px;
+  color: var(--muted);
+}
+.gradingfoot svg {
+  flex-shrink: 0;
+}
+.gradingfoot p {
+  font-size: 10px;
+}
+.scoreform {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.scoreform input {
+  width: 90px;
+  font-size: 20px;
+  padding: 6px 9px;
+}
+.scoreform > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.scoreform button {
+  font-size: 11px;
+  width: 100%;
+  margin-top: 4px;
+}
+.grading {
+  background: oklch(29% 0.018 245);
+  border-left-color: oklch(22% 0.014 245);
+}
+.grading .eyebrow {
+  color: var(--accent);
+}
+.gradesection {
+  border-color: oklch(43% 0.02 245);
+}
+.gradesection:has(.scoreform) {
+  padding: 15px 12px;
+  background: oklch(35% 0.045 230);
+  border: 1px solid oklch(49% 0.07 230);
+  border-radius: 6px;
+  margin-top: 22px;
+}
+.scoreform input {
+  background: oklch(45% 0.016 245);
+  border-color: oklch(58% 0.02 245);
+  color: var(--ink);
+}
+.scoreform button.primary {
+  background: var(--warm);
+  border-color: var(--warm);
+  color: oklch(22% 0.03 65);
+}
+.scoreform button.primary:hover {
+  background: oklch(83% 0.15 65) !important;
+}
+.gradedlabel {
+  color: var(--good);
+}
+.tags > span {
+  background: oklch(49% 0.11 305);
+  color: oklch(97% 0.01 305);
+}
+.tagform input {
+  background: oklch(35% 0.018 245);
+}
+.gradingfoot {
+  color: oklch(70% 0.02 245);
+}
+.removegrade {
+  font-size: 11px;
+  margin-top: 10px;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 7px;
+}
+.removegrade:hover {
+  color: var(--ink);
+}
+.projecttagpicker {
+  margin-top: 12px;
+}
+.projecttagpicker > span {
+  font-size: 10px;
+}
+.tagchoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.tagchoices button {
+  min-height: 27px;
+  max-width: 100%;
+  height: auto;
+  padding: 4px 6px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  text-align: left;
+  justify-content: flex-start;
+}
+.tagchoices button svg {
+  flex-shrink: 0;
+}
+.tagchoices button[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: oklch(30% 0.035 225);
+}

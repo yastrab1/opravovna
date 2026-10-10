@@ -3,19 +3,24 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "miniflare": "4.20260515.0",
     "@napi-rs/canvas": "1.0.10",
     "canvas": "file:./canvas",
-    "fabric": "6.9.1",
-    "jsdom": "20.0.3",
-    "pdf-lib": "1.17.1",
-    "pdfjs-dist": "5.7.284",
+    "fabric": "^7.4.0",
+    "jsdom": "^26.1.0",
     "jszip": "3.10.1",
-    "msgpackr": "1.11.5"
+    "miniflare": "^4.20260730.0",
+    "msgpackr": "1.11.5",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "^6.2.108"
   },
   "overrides": {
     "fabric": {
       "canvas": "$canvas"
-    }
+    },
+    "miniflare": {
+      "sharp": "0.35.5",
+      "undici": "7.29.1"
+    },
+    "ws": "8.21.0"
   }
 }

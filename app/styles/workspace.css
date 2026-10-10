@@ -1,0 +1,94 @@
+.projectbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  min-height: 73px;
+}
+.backbutton {
+  border: 0;
+  color: var(--muted);
+  padding-left: 0;
+}
+.projectname {
+  min-width: 0;
+}
+.projectname .eyebrow {
+  display: block;
+}
+.projectname strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45vw;
+  font-size: 15px;
+}
+.projectactions {
+  display: flex;
+  gap: 7px;
+  margin-left: auto;
+}
+.sync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.statusdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--good);
+}
+.statusdot.amber {
+  background: oklch(65% 0.13 75);
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 265px minmax(0, 1fr) 230px;
+  height: calc(100dvh - 135px);
+  min-height: 500px;
+}
+.projectempty {
+  grid-column: 2/4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  gap: 15px;
+  padding: 35px;
+  color: var(--muted);
+}
+.projectempty h2 {
+  color: var(--ink);
+  font-size: 22px;
+}
+.projectempty p {
+  max-width: 48ch;
+}
+.projectbar {
+  background: oklch(25% 0.018 250);
+}
+.backbutton {
+  background: transparent;
+}
+.projectactions > button:not(.primary) {
+  background: transparent;
+  color: var(--muted);
+}
+.projectactions > button:not(.primary):hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.workspace {
+  grid-template-columns: 285px minmax(0, 1fr) 230px;
+}
+.projectempty {
+  background: oklch(27% 0.013 245);
+}

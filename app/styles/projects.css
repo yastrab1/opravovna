@@ -1,0 +1,135 @@
+.projects {
+  max-width: 1000px;
+  margin: 60px auto;
+  padding: 0 30px;
+}
+.sectionintro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.sectionintro h1 {
+  margin: 8px 0;
+}
+.newproject {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.newproject input {
+  flex: 1;
+}
+.projectlist {
+  margin-top: 22px;
+}
+.projectrow {
+  width: 100%;
+  padding: 20px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  justify-content: flex-start;
+  gap: 16px;
+  text-align: left;
+  background: transparent;
+}
+.projectrow strong {
+  font-size: 16px;
+}
+.projectrow small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 12px;
+}
+.foldericon {
+  width: 42px;
+  height: 42px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+.rowend {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.empty {
+  padding: 65px;
+  text-align: center;
+  color: var(--muted);
+}
+.empty svg {
+  margin-bottom: 15px;
+}
+.empty h2 {
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+.empty p {
+  margin: auto;
+}
+.welcome {
+  padding: 100px 35px;
+  max-width: 950px;
+  margin: auto;
+}
+.welcome h1 {
+  font-size: 42px;
+  line-height: 1.2;
+  margin: 18px 0;
+  letter-spacing: -1.2px;
+}
+.welcome p {
+  font-size: 17px;
+  color: var(--muted);
+  margin-bottom: 28px;
+  max-width: 52ch;
+}
+.welcomefoot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  margin-top: 50px;
+  font-size: 12px;
+}
+.joinbox {
+  padding: 16px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.joinbox button {
+  margin-left: auto;
+}
+.projects .sectionintro > svg {
+  color: var(--warm);
+}
+.foldericon {
+  background: oklch(34% 0.035 65);
+  color: var(--warm);
+}
+.projectrow {
+  background: transparent;
+}
+.projectrow:hover {
+  background: oklch(30% 0.02 245);
+}
+.welcome .eyebrow {
+  color: var(--warm);
+}
+.welcome h1 {
+  font-weight: 500;
+}
