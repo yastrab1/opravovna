@@ -96,6 +96,10 @@ export default function Workspace() {
       )}
       <WorkspaceHeader
         projectId={project?.id}
+        documentId={active}
+        onOpenDocument={switchDoc}
+        busy={!!busy}
+        onError={report}
         isSignedIn={isSignedIn}
         preferences={preferences}
         persistPreferences={persistPreferences}

@@ -63,3 +63,46 @@
     height: 22px;
   }
 }
+.project-presence button.presence-person {
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  background: var(--panel);
+}
+.project-presence button.presence-person:hover {
+  background: var(--surface);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.presence-more {
+  position: relative;
+}
+.presence-more > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.presence-more > summary::-webkit-details-marker {
+  display: none;
+}
+.presence-menu {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: min(270px, 75vw);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 4px 12px oklch(10% 0.01 250 / 0.3);
+}
+.presence-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}

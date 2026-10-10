@@ -50,6 +50,8 @@ export const projectPresence = sqliteTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     image: text("image").notNull(),
+    document: text("document"),
+    activity: integer("activity").notNull().default(0),
     updated: integer("updated").notNull(),
   },
   (table) => [

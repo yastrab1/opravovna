@@ -6,11 +6,19 @@ import Link from "next/link";
 import { PencilMark } from "./icons";
 export default function WorkspaceHeader({
   projectId,
+  documentId,
+  onOpenDocument,
+  busy,
+  onError,
   isSignedIn,
   preferences,
   persistPreferences,
 }: {
   projectId?: string;
+  documentId?: string | null;
+  onOpenDocument: (id: string) => Promise<void>;
+  busy: boolean;
+  onError: (error: unknown) => void;
   isSignedIn: boolean | undefined;
   preferences: any;
   persistPreferences: any;
@@ -27,7 +35,14 @@ export default function WorkspaceHeader({
         <span className="muted desktop">Priestor na dobrú spätnú väzbu</span>
         {isSignedIn ? (
           <>
-            <ProjectViewers projectId={projectId} />
+            <ProjectViewers
+              key={projectId}
+              projectId={projectId}
+              documentId={documentId}
+              onOpenDocument={onOpenDocument}
+              busy={busy}
+              onError={onError}
+            />
             <ToolSettings
               tools={preferences.tools}
               onSave={(tools) => persistPreferences({ tools })}

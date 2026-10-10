@@ -5,6 +5,7 @@ export type ProjectViewer = {
   name: string;
   image: string;
   updated: number;
+  documentId: string | null;
 };
 export function viewerInitials(name: string) {
   const parts = name.trim().split(/\s+/);

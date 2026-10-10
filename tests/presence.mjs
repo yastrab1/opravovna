@@ -39,7 +39,74 @@ try {
   assert.equal(result.status, 200);
   assert.equal(result.data[0].name, owner.displayName);
   assert.equal(result.data[0].image, owner.imageUrl);
-  await req(owner, `${base}/${second}`, "PUT");
+  const docA = crypto.randomUUID(),
+    docB = crypto.randomUUID(),
+    foreignDoc = crypto.randomUUID();
+  for (const [id, pid] of [
+    [docA, project],
+    [docB, project],
+    [foreignDoc, other],
+  ])
+    await DB.prepare(
+      "INSERT INTO documents(id,project,path,metadata,original,updated) VALUES(?,?,?,?,?,?)",
+    )
+      .bind(id, pid, id + ".pdf", "{}", "test.pdf", Date.now())
+      .run();
+  await req(owner, `${base}/${first}`, "PUT", {
+    documentId: docA,
+    active: true,
+  });
+  await DB.prepare("UPDATE project_presence SET activity=? WHERE session=?")
+    .bind(Date.now() - 2000, first)
+    .run();
+  await req(owner, `${base}/${second}`, "PUT", {
+    documentId: docB,
+    active: false,
+  });
+  assert.equal(
+    (await req(owner, base)).data[0].documentId,
+    docA,
+    "A background heartbeat cannot steal the focused tab's location",
+  );
+  await req(owner, `${base}/${first}`, "PUT", {
+    documentId: docB,
+    active: true,
+  });
+  assert.equal(
+    (await req(owner, base)).data[0].documentId,
+    docB,
+    "Switching the focused solution updates the follow target",
+  );
+  assert.equal(
+    (await req(owner, `${base}/${first}`, "PUT", { documentId: foreignDoc }))
+      .status,
+    404,
+    "Cross-project locations are rejected",
+  );
+  assert.equal(
+    (await req(owner, `${base}/${first}`, "PUT", { documentId: 123 })).status,
+    400,
+  );
+  assert.equal(
+    (
+      await req(owner, `${base}/${first}`, "PUT", {
+        documentId: null,
+        padding: "x".repeat(600),
+      })
+    ).status,
+    413,
+  );
+  assert.equal(
+    (await req(owner, base)).data[0].documentId,
+    docB,
+    "Invalid announcements preserve the current target",
+  );
+  await DB.prepare("DELETE FROM documents WHERE id=?").bind(docB).run();
+  assert.equal(
+    (await req(owner, base)).data[0].documentId,
+    null,
+    "Deleted solutions cannot remain follow targets",
+  );
   assert.equal(
     (await req(viewer, base)).data.length,
     1,
@@ -102,7 +169,7 @@ try {
   );
   assert.equal((await req(viewer, base)).status, 403);
   console.log(
-    "PASS: trusted viewer profiles, member-only presence, read-only participation, tab deduplication, project isolation, scoped leave, expiry and revocation",
+    "PASS: trusted viewer profiles, member-only presence, read-only participation, tab deduplication, project isolation, scoped leave, expiry, revocation and validated focused-solution targets",
   );
 } finally {
   await mf.dispose();

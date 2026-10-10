@@ -185,6 +185,15 @@ export function useProjectSession(
   }, [project?.id]);
   async function switchDoc(id: string) {
     if (await save()) {
+      const project = current.current.project;
+      if (!project.documents.some((doc: any) => doc.id === id)) {
+        const fresh = normalizeArnoldProject(
+          await api("projects/" + project.id),
+        );
+        if (!fresh.documents.some((doc: any) => doc.id === id))
+          throw new Error("Riešenie už nie je dostupné.");
+        setProject(fresh);
+      }
       dirty.current = false;
       setActive(id);
     }
