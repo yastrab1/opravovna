@@ -7,7 +7,6 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
-import { pack } from 'msgpackr';
 import { exportName, projectTitle, gradedFilePath, legacyGradedFilePath } from './dist/export/archive.mjs';
 
 class RenderPool {
@@ -82,17 +81,8 @@ export function createExporter(getBucket, options = {}) {
     if (!original) throw new Error('Pôvodný ZIP archív sa nenašiel.');
     // Consume the R2 body stream. Calling arrayBuffer() on Miniflare's proxy
     // serializes the entire file through RPC and blocks other requests.
-    const zip = await JSZip.loadAsync(await new Response(original.body).arrayBuffer());
-    const legacy = structuredClone(snapshot.project.legacy);
-    legacy.tags ??= []; legacy.changes ??= {}; legacy.scoringCriteria ??= [];
-    const sidecar = { version: 1, documents: {} };
-    // Metadata order is deterministic even though PDFs render concurrently.
-    for (const document of snapshot.documents) {
-      const { metadata: m, state } = document, old = legacy.changes[m.submissionId] ?? {};
-      legacy.changes[m.submissionId] = { ...old, changes: state.changes, tags: state.tags, scoring: state.scoring, opened: old.opened ?? false, timeOpened: old.timeOpened ?? 0 };
-      sidecar.documents[document.path] = state;
-      for (const tag of state.tags ?? []) if (!legacy.tags.some(t => (typeof t === 'object' ? t.name : t) === (typeof tag === 'object' ? tag.name : tag))) legacy.tags.push(tag);
-    }
+    const sourceZip = await JSZip.loadAsync(await new Response(original.body).arrayBuffer());
+    const zip = new JSZip();
     let index = 0, failure;
     job.stage = 'pdf';
     const workers = Array.from({ length: Math.min(threads, snapshot.documents.length) }, async () => {
@@ -102,15 +92,11 @@ export function createExporter(getBucket, options = {}) {
           const input = await bucket.get(document.original);
           if (!input) throw new Error('Pôvodné PDF sa nenašlo.');
           const bytes = new Uint8Array(await new Response(input.body).arrayBuffer());
-          zip.file(document.path, bytes);
           const { metadata: m, state } = document;
           const graded = gradedFilePath(document.path);
-          // Remove any old ID-only copy when replacing the flattened file.
-          zip.remove(legacyGradedFilePath(document.path, m.submissionId));
-          zip.remove(graded);
           const changed = state.changes?.length || state.extraPages || Object.values(state.rotations ?? {}).some(v => v !== 0);
-          if (changed) zip.file(graded, await pool.run(bytes.slice(), state));
-          else zip.remove(graded);
+          const output = changed ? await pool.run(bytes.slice(), state) : bytes;
+          zip.file(graded.split('/').pop(), output);
           job.completed++;
         } catch (error) { failure = error; }
       }
@@ -118,8 +104,7 @@ export function createExporter(getBucket, options = {}) {
     await Promise.all(workers);
     if (failure) throw failure;
     if (closing) throw new Error('Server sa reštartuje. Skúste export znova.');
-    zip.file('changes.arn', pack(legacy)); zip.file('opravovna.json', JSON.stringify(sidecar));
-    const pointsFile = Object.values(zip.files).find(entry => !entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, '')));
+    const pointsFile = Object.values(sourceZip.files).find(entry => !entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, '')));
     let points = { criteria: {}, scores: {} };
     if (pointsFile) {
       try { const parsed = JSON.parse(await pointsFile.async('string')); if (parsed && typeof parsed === 'object') points = { ...points, ...parsed, scores: { ...(parsed.scores ?? {}) } }; } catch {}
@@ -131,9 +116,7 @@ export function createExporter(getBucket, options = {}) {
       const comments = (document.state.changes ?? []).filter(change => change.type === 'Text' && change.data?.text && change.data?.name !== scoring.annotName).map(change => change.data.text);
       points.scores[submissionId] = { ...previous, acceptedCriteria: scoring.acceptedCriteria ?? previous.acceptedCriteria ?? [], final: scoring.final ?? true, points: scoring.points, comments: scoring.comments ?? (comments.length ? [...comments, `${scoring.points}B`] : [`${scoring.points}B`]) };
     }
-    for (const entry of Object.values(zip.files)) if (!entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, ''))) zip.remove(entry.name);
-    const pdfFolder = snapshot.documents[0]?.path.includes('/') ? snapshot.documents[0].path.slice(0, snapshot.documents[0].path.lastIndexOf('/')) : '';
-    zip.file(`${pdfFolder ? `${pdfFolder}/` : ''}points.json`, JSON.stringify(points, null, 2));
+    zip.file('points.json', JSON.stringify(points, null, 2));
     job.stage = 'packing';
     await fs.mkdir(directory, { recursive: true });
     await pipeline(zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true, compression: 'STORE' }, update => { job.percent = Math.round(update.percent); }), createWriteStream(job.file, { mode: 0o600 }));

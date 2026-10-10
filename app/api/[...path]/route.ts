@@ -79,7 +79,7 @@ async function handle(req:Request) {
  }
  if(p[2]==='documents'&&!p[3]&&req.method==='POST'){
   const path=decodeURIComponent(req.headers.get('x-file-path')||'');let meta;try{meta=parseSubmission(path);}catch{fail('Neplatná cesta v archíve.');}if(!meta)fail('Neplatný názov PDF.');
-  const existing=await DB.prepare('SELECT id,state,revision FROM documents WHERE project=? AND path=?').bind(project.id,path).first();if(existing)return json({...existing,state:JSON.parse((existing as any).state),existing:true});
+  const existing=await DB.prepare("SELECT id,state,revision FROM documents WHERE project=? AND (path=? OR json_extract(metadata,'$.submissionId')=?) LIMIT 1").bind(project.id,path,meta.submissionId).first();if(existing)return json({...existing,state:JSON.parse((existing as any).state),existing:true});
   const bytes=await req.arrayBuffer();if(bytes.byteLength>40*1024*1024)fail('PDF je príliš veľké (max. 40 MB).',413);if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')fail('Súbor nie je PDF.');
   const did=id(),key=`${project.id}/documents/${did}/original.pdf`;await BUCKET.put(key,bytes);
   const legacy=JSON.parse(project.legacy);const old=legacy.changes?.[meta.submissionId]??{};

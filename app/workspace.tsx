@@ -44,10 +44,10 @@ export default function Workspace(){
   try{
    if(!file.name.toLowerCase().endsWith('.zip')||file.size>1024**3)throw new Error('Vyberte ZIP archív do 1 GB.');
    setBusy('Kontrolujem archív…');const JSZip=(await import('jszip')).default;const zip=await JSZip.loadAsync(file);const entries=Object.values(zip.files).filter(x=>!x.dir);let total=0;
-   const pdfs=entries.filter(x=>parseSubmission(x.name));if(!pdfs.length)throw new Error('ZIP neobsahuje riešenia vo formáte p4-c8-meno-12345.pdf.');if(pdfs.length>2000)throw new Error('Najviac 2000 riešení na projekt.');
+   let pdfs=entries.filter(x=>parseSubmission(x.name));const gradedOnly=!pdfs.length;if(gradedOnly)pdfs=entries.filter(x=>/_graded\.pdf$/i.test(x.name)&&parseSubmission(x.name.replace(/_graded\.pdf$/i,'.pdf')));if(!pdfs.length)throw new Error('ZIP neobsahuje riešenia vo formáte p4-c8-meno-12345.pdf.');if(pdfs.length>2000)throw new Error('Najviac 2000 riešení na projekt.');
    // Validate before creating files; no archive paths are ever used as storage keys.
    for(const f of entries){if(f.name.includes('..')||(f.name.startsWith('/')&&f.name!=='/points.json')||f.name.includes('\\'))throw new Error('Archív obsahuje neplatnú cestu.');total+=(f as any)._data?.uncompressedSize??0;}if(total>2*1024**3)throw new Error('Rozbalený archív je príliš veľký.');
-   if(project.folder&&pdfs.some(f=>parseSubmission(f.name)?.folder!==project.folder))throw new Error('Tento ZIP patrí do iného projektu. Vytvorte nový projekt.');
+   if(!gradedOnly&&project.folder&&pdfs.some(f=>parseSubmission(f.name)?.folder!==project.folder))throw new Error('Tento ZIP patrí do iného projektu. Vytvorte nový projekt.');
    const pid=project.id;const root='projects/'+pid;const conflicts:any[]=[];let incomingLegacy:any={};if(zip.file('changes.arn')){const {unpack}=await import('msgpackr');incomingLegacy=unpack(await zip.file('changes.arn')!.async('uint8array'));}
    const pointsFile=entries.find(x=>/(^|\/)points?\.json$/i.test(x.name.replace(/^\//,'')));let pointScores:any={};if(pointsFile){const parsed=JSON.parse(await pointsFile.async('string'));if(!parsed||typeof parsed!=='object'||!parsed.scores||typeof parsed.scores!=='object')throw new Error('Neplatný formát points.json.');pointScores=parsed.scores;incomingLegacy.changes??={};for(const [id,score] of Object.entries(pointScores)){if(!score||typeof score!=='object'||!Number.isFinite(Number((score as any).points)))continue;const old=incomingLegacy.changes[id]??{};incomingLegacy.changes[id]={...old,scoring:{...old.scoring,...score}};}}
    const up=await api(root+'/archive',{method:'POST'});uploadId=up.id;
@@ -57,15 +57,15 @@ export default function Workspace(){
    let sidecar:any={};if(zip.file('opravovna.json')){sidecar=JSON.parse(await zip.file('opravovna.json')!.async('string'));if(sidecar.version!==1)throw new Error('Nepodporovaná verzia opravovna.json.');}
    let next=0,completed=0,stopped=false;
    const worker=async()=>{while(!stopped){const i=next++;if(i>=pdfs.length)return;
-    const f=pdfs[i],meta=parseSubmission(f.name)!;
+    const f=pdfs[i],sourcePath=gradedOnly?f.name.replace(/_graded\.pdf$/i,'.pdf'):f.name,meta=parseSubmission(sourcePath)!;
     try{
-     const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(f.name)},body:await f.async('uint8array') as any});
-     const graded=zip.file(gradedFilePath(f.name))??zip.file(legacyGradedFilePath(f.name,meta.submissionId));if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
-     const incoming=normalizedState(sidecar.documents?.[f.name]??incomingLegacy.changes?.[meta.submissionId]);if(incoming.scoring?.points==null&&pointScores[meta.submissionId])incoming.scoring={...incoming.scoring,...pointScores[meta.submissionId]};
+     const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(sourcePath)},body:await f.async('uint8array') as any});
+     const graded=gradedOnly?null:zip.file(gradedFilePath(f.name))??zip.file(legacyGradedFilePath(f.name,meta.submissionId));if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
+     const incoming=normalizedState(sidecar.documents?.[sourcePath]??incomingLegacy.changes?.[meta.submissionId]);if(incoming.scoring?.points==null&&pointScores[meta.submissionId])incoming.scoring={...incoming.scoring,...pointScores[meta.submissionId]};
      if(d.existing){const decision=mergeDecision(d.state,incoming);
-      if(decision==='conflict')conflicts.push({projectId:pid,id:d.id,path:f.name,metadata:meta,first:d.state,second:incoming,revision:d.revision,choice:''});
-      if(decision==='replace'){try{await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:d.revision})});}catch(e:any){if(e.status!==409)throw e;const latest=await api(root);const now=latest.documents.find((x:any)=>x.id===d.id);conflicts.push({projectId:pid,id:d.id,path:f.name,metadata:meta,first:now.state,second:incoming,revision:now.revision,choice:''});}}
-     }else if(sidecar.documents?.[f.name])await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:0})});
+      if(decision==='conflict')conflicts.push({projectId:pid,id:d.id,path:sourcePath,metadata:meta,first:d.state,second:incoming,revision:d.revision,choice:''});
+      if(decision==='replace'){try{await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:d.revision})});}catch(e:any){if(e.status!==409)throw e;const latest=await api(root);const now=latest.documents.find((x:any)=>x.id===d.id);conflicts.push({projectId:pid,id:d.id,path:sourcePath,metadata:meta,first:now.state,second:incoming,revision:now.revision,choice:''});}}
+     }else if(sidecar.documents?.[sourcePath]||pointScores[meta.submissionId])await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:0})});
      completed++;setBusy(`Importujem riešenia… ${completed} / ${pdfs.length} (3 súbežne)`);
     }catch(e){stopped=true;throw e;}
    }};
@@ -102,22 +102,17 @@ export default function Workspace(){
  }
  async function exportZipBrowser(){setError('');
   try{setBusy('Načítavam archív zo servera…');const pid=project.id;const fresh=await api('projects/'+pid);const JSZip=(await import('jszip')).default;
-   const res=await fetch('/api/projects/'+pid+'/archive');if(!res.ok)throw new Error('Najprv importujte ZIP archív.');const zip=await JSZip.loadAsync(await res.arrayBuffer());
-   const legacy=structuredClone(fresh.legacy);legacy.tags??=[];legacy.changes??={};legacy.scoringCriteria??=[];
-   const sidecar:any={version:1,documents:{}};const {flattenPdf}=await import('@/lib/pdf-engine');await document.fonts.ready;
+   const res=await fetch('/api/projects/'+pid+'/archive');if(!res.ok)throw new Error('Najprv importujte ZIP archív.');const sourceZip=await JSZip.loadAsync(await res.arrayBuffer());const zip=new JSZip();
+   const {flattenPdf}=await import('@/lib/pdf-engine');await document.fonts.ready;
    for(let i=0;i<fresh.documents.length;i++){
-    const d=fresh.documents[i];setBusy(`Exportujem PDF… ${i+1} / ${fresh.documents.length}`);const m=d.metadata;const old=legacy.changes[m.submissionId]??{};
-    legacy.changes[m.submissionId]={...old,changes:d.state.changes,tags:d.state.tags,scoring:d.state.scoring,opened:old.opened??false,timeOpened:old.timeOpened??0};sidecar.documents[d.path]=d.state;
-    for(const t of d.state.tags)if(!legacy.tags.some((v:any)=>(typeof v==='object'?v.name:v)===(typeof t==='object'?t.name:t)))legacy.tags.push(t);
-    const original=await fetch(`/api/projects/${pid}/documents/${d.id}/file`);if(!original.ok)throw new Error('Pôvodné PDF sa nepodarilo načítať.');const originalBytes=new Uint8Array(await original.arrayBuffer());zip.file(d.path,originalBytes);
+    const d=fresh.documents[i];setBusy(`Exportujem PDF… ${i+1} / ${fresh.documents.length}`);
+    const original=await fetch(`/api/projects/${pid}/documents/${d.id}/file`);if(!original.ok)throw new Error('Pôvodné PDF sa nepodarilo načítať.');const originalBytes=new Uint8Array(await original.arrayBuffer());
     const changed=d.state.changes.length||d.state.extraPages||Object.keys(d.state.rotations??{}).length;
-    const gradedPath=gradedFilePath(d.path);zip.remove(legacyGradedFilePath(d.path,m.submissionId));zip.remove(gradedPath);
-    if(changed){const out=await flattenPdf(originalBytes,d.state);zip.file(gradedPath,out);}
+    const gradedPath=gradedFilePath(d.path);const out=changed?await flattenPdf(originalBytes,d.state):originalBytes;zip.file(gradedPath.split('/').pop()!,out);
    }
-   const pointsFile=Object.values(zip.files).find((x:any)=>!x.dir&&/(^|\/)points?\.json$/i.test(x.name.replace(/^\//,'')));let points:any={criteria:{},scores:{}};if(pointsFile){try{const old=JSON.parse(await pointsFile.async('string'));if(old&&typeof old==='object')points={...points,...old,scores:{...(old.scores??{})}};}catch{}}
+   const pointsFile=Object.values(sourceZip.files).find((x:any)=>!x.dir&&/(^|\/)points?\.json$/i.test(x.name.replace(/^\//,'')));let points:any={criteria:{},scores:{}};if(pointsFile){try{const old=JSON.parse(await pointsFile.async('string'));if(old&&typeof old==='object')points={...points,...old,scores:{...(old.scores??{})}};}catch{}}
    for(const d of fresh.documents){const id=d.metadata.submissionId,s=d.state.scoring??{};if(s.points==null){delete points.scores[id];continue;}const comments=(d.state.changes??[]).filter((c:any)=>c.type==='Text'&&c.data?.text&&c.data?.name!==s.annotName).map((c:any)=>c.data.text);points.scores[id]={...(points.scores[id]??{}),acceptedCriteria:s.acceptedCriteria??[],final:s.final??true,points:s.points,comments:s.comments??(comments.length?[...comments,`${s.points}B`]:[`${s.points}B`])};}
-   for(const entry of Object.values(zip.files) as any[])if(!entry.dir&&/(^|\/)points?\.json$/i.test(entry.name.replace(/^\//,'')))zip.remove(entry.name);const pdfFolder=fresh.documents[0]?.path.includes('/')?fresh.documents[0].path.slice(0,fresh.documents[0].path.lastIndexOf('/')):'';
-   const {pack}=await import('msgpackr');zip.file('changes.arn',pack(legacy));zip.file('opravovna.json',JSON.stringify(sidecar));zip.file(`${pdfFolder?`${pdfFolder}/`:''}points.json`,JSON.stringify(points,null,2));setBusy('Balím archív…');download(await zip.generateAsync({type:'blob',compression:'STORE'}),exportName(fresh.folder?projectTitle(fresh.folder):fresh.title));
+   zip.file('points.json',JSON.stringify(points,null,2));setBusy('Balím archív…');download(await zip.generateAsync({type:'blob',compression:'STORE'}),exportName(fresh.folder?projectTitle(fresh.folder):fresh.title));
   }catch(e){report(e);}finally{setBusy('');}
  }
  async function openSharing(){setSharing(!sharing);if(!sharing){try{setMembers(await api(`projects/${project.id}/members`));setLink(project.share?location.origin+'/?join='+project.share:'');}catch(e){report(e);}}}
