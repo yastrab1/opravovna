@@ -11,6 +11,14 @@ import { api,download } from '@/lib/client-api';
 import {tagName,collectTags} from '@/lib/tags';
 import { parseSubmission,exportName,projectTitle,gradedFilePath,legacyGradedFilePath } from '@/lib/archive';
 const PdfEditor=dynamic(()=>import('./pdf-editor'),{ssr:false,loading:()=> <div className="loading">Pripravujem editor…</div>});
+function sameBytes(a:Uint8Array,b:Uint8Array){if(a.byteLength!==b.byteLength)return false;for(let i=0;i<a.byteLength;i++)if(a[i]!==b[i])return false;return true;}
+function stateComments(state:any){if(Array.isArray(state.scoring?.comments))return state.scoring.comments;const comments=(state.changes??[]).filter((change:any)=>change.type==='Text'&&change.data?.text&&change.data?.name!==state.scoring?.annotName).map((change:any)=>change.data.text);return state.scoring?.points==null?comments:[...comments,`${state.scoring.points}B`];}
+async function sameGradedSubmission(projectId:string,doc:any,incoming:any,pdf:Uint8Array){if(doc.state.scoring?.points!==incoming.scoring?.points||JSON.stringify(stateComments(doc.state))!==JSON.stringify(stateComments(incoming)))return false;
+ const matches=async(url:string)=>{try{const response=await fetch(url);if(!response.ok)return false;return sameBytes(new Uint8Array(await response.arrayBuffer()),pdf);}catch{return false;}};
+ const base=`/api/projects/${projectId}/documents/${doc.id}/file`;if(doc.graded&&await matches(base+'?graded=1'))return true;if(await matches(base))return true;
+ const state=doc.state;if(!state.changes?.length&&!state.extraPages&&!Object.values(state.rotations??{}).some((value:any)=>value!==0))return false;
+ try{const response=await fetch(base);if(!response.ok)return false;const original=new Uint8Array(await response.arrayBuffer());const {flattenPdf}=await import('@/lib/pdf-engine');return sameBytes(await flattenPdf(original,state),pdf);}catch{return false;}
+}
 export default function Workspace(){
  const {isLoaded,isSignedIn,user}=useUser();const [projects,setProjects]=useState<any[]>([]),[project,setProject]=useState<any>(null),[active,setActive]=useState<string|null>(null),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[tagFilter,setTagFilter]=useState(''),[newTitle,setNewTitle]=useState(''),[busy,setBusy]=useState(''),[error,setError]=useState(''),[saveStatus,setSaveStatus]=useState('Uložené'),[sharing,setSharing]=useState(false),[members,setMembers]=useState<any[]>([]),[email,setEmail]=useState(''),[memberRole,setMemberRole]=useState('editor'),[link,setLink]=useState(''),[tag,setTag]=useState(''),[mergeConflicts,setMergeConflicts]=useState<any[]>([]),[mergeOpen,setMergeOpen]=useState(false);
  const [preferences,setPreferences]=useState<Preferences>(()=>readPreferences({}));const preferencesRef=useRef(preferences),preferenceQueue=useRef<Promise<any>>(Promise.resolve());
@@ -57,12 +65,12 @@ export default function Workspace(){
    let sidecar:any={};if(zip.file('opravovna.json')){sidecar=JSON.parse(await zip.file('opravovna.json')!.async('string'));if(sidecar.version!==1)throw new Error('Nepodporovaná verzia opravovna.json.');}
    let next=0,completed=0,stopped=false;
    const worker=async()=>{while(!stopped){const i=next++;if(i>=pdfs.length)return;
-    const f=pdfs[i],sourcePath=gradedOnly?f.name.replace(/_graded\.pdf$/i,'.pdf'):f.name,meta=parseSubmission(sourcePath)!;
+    const f=pdfs[i],sourcePath=gradedOnly?f.name.replace(/_graded\.pdf$/i,'.pdf'):f.name,meta=parseSubmission(sourcePath)!,pdfBytes=await f.async('uint8array');
     try{
-     const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(sourcePath)},body:await f.async('uint8array') as any});
+     const d=await api(root+'/documents',{method:'POST',headers:{'x-file-path':encodeURIComponent(sourcePath)},body:pdfBytes as any});
      const graded=gradedOnly?null:zip.file(gradedFilePath(f.name))??zip.file(legacyGradedFilePath(f.name,meta.submissionId));if(graded&&!d.existing)await api(root+'/documents/'+d.id+'/graded',{method:'PUT',body:await graded.async('uint8array') as any});
      const incoming=normalizedState(sidecar.documents?.[sourcePath]??incomingLegacy.changes?.[meta.submissionId]);if(incoming.scoring?.points==null&&pointScores[meta.submissionId])incoming.scoring={...incoming.scoring,...pointScores[meta.submissionId]};
-     if(d.existing){const decision=mergeDecision(d.state,incoming);
+     if(d.existing){if(await sameGradedSubmission(pid,d,incoming,pdfBytes)){completed++;setBusy(`Importujem riešenia… ${completed} / ${pdfs.length} (3 súbežne)`);continue;}const decision=mergeDecision(d.state,incoming);
       if(decision==='conflict')conflicts.push({projectId:pid,id:d.id,path:sourcePath,metadata:meta,first:d.state,second:incoming,revision:d.revision,choice:''});
       if(decision==='replace'){try{await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:d.revision})});}catch(e:any){if(e.status!==409)throw e;const latest=await api(root);const now=latest.documents.find((x:any)=>x.id===d.id);conflicts.push({projectId:pid,id:d.id,path:sourcePath,metadata:meta,first:now.state,second:incoming,revision:now.revision,choice:''});}}
      }else if(sidecar.documents?.[sourcePath]||pointScores[meta.submissionId])await api(root+'/documents/'+d.id,{method:'PATCH',body:JSON.stringify({state:incoming,revision:0})});
