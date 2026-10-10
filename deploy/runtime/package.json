@@ -7,7 +7,7 @@
     "canvas": "file:./canvas",
     "fabric": "^7.4.0",
     "jsdom": "^26.1.0",
-    "jszip": "3.10.1",
+    "jszip": "3.10.2",
     "miniflare": "^4.20260730.0",
     "msgpackr": "1.11.5",
     "pdf-lib": "1.17.1",
