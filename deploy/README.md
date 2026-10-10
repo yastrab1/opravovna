@@ -2,14 +2,15 @@
 
 The image runs the compiled application on local workerd through a pinned
 Miniflare runtime. It does not run Wrangler's development server, watch files,
-or call hosted D1/R2. The Clerk instance is still the development instance.
+or call hosted D1/R2. The live deployment uses Clerk's production instance for
+`opravovna.tech`, with Google OAuth and verified domain/email DNS.
 
 Build with the public Clerk key (never a secret key):
 
 ```sh
-export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
-docker build --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY -t ghcr.io/yastrab1/opravovna:test .
-docker push ghcr.io/yastrab1/opravovna:test
+npx clerk env pull --instance prod --file .sites-runtime/clerk-production.env
+node --env-file=.sites-runtime/clerk-production.env scripts/build-container.mjs ghcr.io/yastrab1/opravovna:production
+docker push ghcr.io/yastrab1/opravovna:production
 ```
 
 On `r2d2`, `/home/r2d2/unified/personal-project.compose.yml` is included by
@@ -24,7 +25,7 @@ curl -f http://127.0.0.1:8791/healthz
 ```
 
 The deployment pins the application image digest. The checked-in template uses
-the `test` tag for initial setup; replace it with the digest when deploying.
+the `production` tag for initial setup; replace it with the digest when deploying.
 Updates require building/pushing a new image, changing the image digest in the
 personal Compose file, and running `up -d` for these two services.
 
@@ -64,3 +65,26 @@ availability after migrations; it does not validate external Clerk availability.
 
 The old workers.dev test has its own remote D1/R2 data. It is not the source of
 this laptop-to-r2d2 migration and is left intact.
+
+## Production authentication cutover
+
+The production Clerk instance is `ins_3KVT9YhcVblXiwbLYqX3gqTqFYp` in the same
+Opravovna application. Google OAuth credentials are stored in Clerk, not in the
+container. Production Clerk API keys are runtime secrets; only the publishable
+key is supplied at image build time. Local development continues to use its
+separate development keys.
+
+Clerk development sessions and user IDs do not carry over. A replacement
+production account was provisioned with the existing verified email, and its
+account preferences were copied. The application's project owners and upload
+owners were remapped to the production account ID, preserving all PDF and
+annotation records. Existing memberships remain keyed by email. Users must sign
+in again on the production domain.
+
+`migrate-clerk-owners.py` previews or applies this one-time ID remapping using a
+private JSON map. Stop the application and take a database backup before using
+`--apply`; the script checks for unmapped owners and preserves document rows.
+The server retains the private map in `secrets/opravovna-account-map.json` and a
+pre-cutover database, environment and Compose snapshot under
+`backups/opravovna/before-clerk-production-*`. Restore the database, keys and
+image together when rolling this authentication cutover back.
