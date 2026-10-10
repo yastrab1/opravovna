@@ -68,7 +68,7 @@ export function useAccountPreferences(
           await user!.update({
             unsafeMetadata: { ...user!.unsafeMetadata, opravovna: value },
           });
-          if (version === generation) {
+          if (!stopped && version === generation) {
             pending = {};
             cachePendingPreferences(storage, accountId, pending);
           }
