@@ -80,6 +80,41 @@ try {
     ),
     true,
   );
+  const taggedOnly = normalizedState({
+    tags: [
+      {
+        id: "arnold-tag",
+        meno: "kontrola",
+        name: "kontrola",
+        color: "#F2C511ff",
+      },
+    ],
+  });
+  assert.equal(
+    await sameGradedSubmission(
+      "project",
+      { id: "doc", state: normalizedState() },
+      taggedOnly,
+      new Uint8Array([1, 2, 3]),
+    ),
+    false,
+    "An unchanged ungraded PDF cannot hide imported Arnold tags",
+  );
+  assert.equal(
+    mergeDecision(normalizedState(), taggedOnly),
+    "replace",
+    "Tag-only changes must import into an untouched solution",
+  );
+  assert.equal(
+    await sameGradedSubmission(
+      "project",
+      { id: "doc", state: taggedOnly },
+      structuredClone(taggedOnly),
+      new Uint8Array([1, 2, 3]),
+    ),
+    true,
+    "Reimporting identical tags stays a duplicate",
+  );
   const drawn = {
     ...plain,
     changes: [{ page: 0, type: "Path", data: { path: "M 0 0 L 10 10" } }],
