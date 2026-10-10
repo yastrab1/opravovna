@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
-import { exportName, projectTitle, gradedFilePath, legacyGradedFilePath } from './dist/export/archive.mjs';
+import { exportName, projectTitle } from './dist/export/archive.mjs';
 
 class RenderPool {
   constructor(size) { this.slots = Array.from({ length: size }, () => ({ worker: null, task: null })); this.queue = []; }
@@ -83,17 +83,18 @@ export function createExporter(getBucket, options = {}) {
     // serializes the entire file through RPC and blocks other requests.
     const sourceZip = await JSZip.loadAsync(await new Response(original.body).arrayBuffer());
     const zip = new JSZip();
+    const exportDocuments = snapshot.documents.filter(document => document.state.scoring?.points != null);
     let index = 0, failure;
     job.stage = 'pdf';
-    const workers = Array.from({ length: Math.min(threads, snapshot.documents.length) }, async () => {
-      while (!failure && !closing && index < snapshot.documents.length) {
-        const document = snapshot.documents[index++];
+    const workers = Array.from({ length: Math.min(threads, exportDocuments.length) }, async () => {
+      while (!failure && !closing && index < exportDocuments.length) {
+        const document = exportDocuments[index++];
         try {
           const input = await bucket.get(document.original);
           if (!input) throw new Error('Pôvodné PDF sa nenašlo.');
           const bytes = new Uint8Array(await new Response(input.body).arrayBuffer());
-          const { metadata: m, state } = document;
-          const graded = gradedFilePath(document.path);
+          const { state } = document;
+          const graded = document.path.split('/').pop();
           const changed = state.changes?.length || state.extraPages || Object.values(state.rotations ?? {}).some(v => v !== 0);
           const output = changed ? await pool.run(bytes.slice(), state) : bytes;
           zip.file(graded.split('/').pop(), output);
@@ -107,16 +108,16 @@ export function createExporter(getBucket, options = {}) {
     const pointsFile = Object.values(sourceZip.files).find(entry => !entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, '')));
     let points = { criteria: {}, scores: {} };
     if (pointsFile) {
-      try { const parsed = JSON.parse(await pointsFile.async('string')); if (parsed && typeof parsed === 'object') points = { ...points, ...parsed, scores: { ...(parsed.scores ?? {}) } }; } catch {}
+      try { const parsed = JSON.parse(await pointsFile.async('string')); if (parsed && typeof parsed === 'object') points = { ...points, ...parsed, scores: {} }; } catch {}
     }
     for (const document of snapshot.documents) {
       const { submissionId } = document.metadata, scoring = document.state.scoring ?? {};
-      if (scoring.points == null) { delete points.scores[submissionId]; continue; }
-      const previous = points.scores[submissionId] ?? {};
+      if (scoring.points == null) continue;
+      const previous = {};
       const comments = (document.state.changes ?? []).filter(change => change.type === 'Text' && change.data?.text && change.data?.name !== scoring.annotName).map(change => change.data.text);
       points.scores[submissionId] = { ...previous, acceptedCriteria: scoring.acceptedCriteria ?? previous.acceptedCriteria ?? [], final: scoring.final ?? true, points: scoring.points, comments: scoring.comments ?? (comments.length ? [...comments, `${scoring.points}B`] : [`${scoring.points}B`]) };
     }
-    zip.file('points.json', JSON.stringify(points, null, 2));
+    zip.file('/points.json', JSON.stringify(points, null, 2));
     job.stage = 'packing';
     await fs.mkdir(directory, { recursive: true });
     await pipeline(zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true, compression: 'STORE' }, update => { job.percent = Math.round(update.percent); }), createWriteStream(job.file, { mode: 0o600 }));
@@ -153,7 +154,7 @@ export function createExporter(getBucket, options = {}) {
         const retained = [...jobs.values()].filter(j => ['ready', 'error'].includes(j.status));
         while (retained.length >= 8) await remove(retained.shift());
         const id = randomUUID(), title = snapshot.project.folder ? projectTitle(snapshot.project.folder) : snapshot.project.title;
-        const job = { id, fingerprint, owner, project, snapshot, status: 'queued', stage: 'queued', completed: 0, total: snapshot.documents.length, percent: 0, file: path.join(directory, id + '.zip'), filename: exportName(title) };
+        const job = { id, fingerprint, owner, project, snapshot, status: 'queued', stage: 'queued', completed: 0, total: snapshot.documents.filter(document => document.state.scoring?.points != null).length, percent: 0, file: path.join(directory, id + '.zip'), filename: exportName(title) };
         jobs.set(id, job); queue.push(job); void pump();
         return Response.json(publicJob(job));
       }

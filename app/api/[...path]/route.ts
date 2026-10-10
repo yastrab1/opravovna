@@ -85,7 +85,7 @@ async function handle(req:Request) {
   const legacy=JSON.parse(project.legacy);const old=legacy.changes?.[meta.submissionId]??{};
   const state={changes:old.changes??[],tags:old.tags??[],scoring:old.scoring??{},rotations:{},extraPages:0};
   await DB.prepare('INSERT INTO documents(id,project,path,metadata,original,state,updated) VALUES(?,?,?,?,?,?,?)').bind(did,project.id,path,JSON.stringify(meta),key,JSON.stringify(state),Date.now()).run();
-  if(!project.folder)await DB.prepare("UPDATE projects SET folder=?, title=CASE WHEN title='Nový projekt' THEN ? ELSE title END WHERE id=?").bind(meta.folder,projectTitle(meta.folder),project.id).run();return json({id:did});
+  if(!project.folder&&meta.folder)await DB.prepare("UPDATE projects SET folder=?, title=CASE WHEN title='Nový projekt' THEN ? ELSE title END WHERE id=?").bind(meta.folder,projectTitle(meta.folder),project.id).run();return json({id:did});
  }
  if(p[2]==='documents'&&p[3]){
   const doc=await DB.prepare('SELECT * FROM documents WHERE id=? AND project=?').bind(p[3],project.id).first<any>();if(!doc)fail('PDF neexistuje.',404);
