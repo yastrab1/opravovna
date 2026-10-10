@@ -25,12 +25,26 @@ export type ToolStyle = {
   bold: boolean;
   italic: boolean;
 };
+export type ProjectPreferences = {
+  categories: string[];
+  sort: "name" | "graded";
+  points?: PointsFilter;
+  query: string;
+  filter: "all" | "graded" | "ungraded";
+  tagFilter: string;
+};
+export function defaultProjectPreferences(): ProjectPreferences {
+  return {
+    categories: [],
+    sort: "name",
+    query: "",
+    filter: "all",
+    tagFilter: "",
+  };
+}
 export type Preferences = {
   tools: Record<ToolKey, ToolStyle>;
-  projects: Record<
-    string,
-    { categories: string[]; sort: "name" | "graded"; points?: PointsFilter }
-  >;
+  projects: Record<string, ProjectPreferences>;
 };
 export function categoryLabel(code: string) {
   const value = String(code).replace(/^c/i, "").toLowerCase();
@@ -91,6 +105,9 @@ export function readPreferences(raw: any): Preferences {
         : [],
       sort: v?.sort === "graded" ? "graded" : "name",
       points: readPointsFilter(v?.points),
+      query: typeof v?.query === "string" ? v.query : "",
+      filter: ["graded", "ungraded"].includes(v?.filter) ? v.filter : "all",
+      tagFilter: typeof v?.tagFilter === "string" ? v.tagFilter : "",
     };
   }
   return { tools, projects };

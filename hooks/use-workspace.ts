@@ -15,10 +15,7 @@ import { useImportScores } from "./use-import-scores";
 export function useWorkspace() {
   const scoreCorrection = useImportScores();
   const { isLoaded, isSignedIn, user } = useUser();
-  const [query, setQuery] = useState(""),
-    [filter, setFilter] = useState("all"),
-    [tagFilter, setTagFilter] = useState(""),
-    [sharing, setSharing] = useState(false),
+  const [sharing, setSharing] = useState(false),
     [members, setMembers] = useState<any[]>([]),
     [email, setEmail] = useState(""),
     [memberRole, setMemberRole] = useState("editor"),
@@ -62,6 +59,13 @@ export function useWorkspace() {
     setProjectPreferences,
     setCategories,
   } = useAccountPreferences(user, project?.id, report);
+
+  const { query, filter, tagFilter } = projectPreferences;
+  const setQuery = (query: string) => setProjectPreferences({ query });
+  const setFilter = (filter: typeof projectPreferences.filter) =>
+    setProjectPreferences({ filter });
+  const setTagFilter = (tagFilter: string) =>
+    setProjectPreferences({ tagFilter });
 
   useEffect(() => {
     if (mergeOpen) mergeDialog.current?.showModal();

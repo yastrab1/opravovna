@@ -1,65 +1,146 @@
 "use client";
-import { readPreferences, type Preferences } from "@/lib/preferences";
+import {
+  defaultProjectPreferences,
+  readPreferences,
+  type Preferences,
+  type ProjectPreferences,
+} from "@/lib/preferences";
+import {
+  cachePendingPreferences,
+  mergePreferencePatch,
+  readPendingPreferences,
+} from "@/lib/preference-cache";
 import type { useUser } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
 export function useAccountPreferences(
   user: ReturnType<typeof useUser>["user"],
-  projectId: string,
+  projectId: string | undefined,
   report: (error: any) => void,
 ) {
-  const [preferences, setPreferences] = useState<Preferences>(() =>
-    readPreferences({}),
-  );
-  const preferencesRef = useRef(preferences),
-    preferenceQueue = useRef<Promise<any>>(Promise.resolve());
+  const [state, setState] = useState({
+    accountId: "",
+    value: readPreferences({}),
+  });
+  const accountId = user?.id;
+  const userRef = useRef(user);
+  userRef.current = user;
+  const reportRef = useRef(report);
+  reportRef.current = report;
+  const controller = useRef<{
+    accountId: string;
+    value: Preferences;
+    update: (patch: Partial<Preferences>, immediate: boolean) => Promise<void>;
+  } | null>(null);
   useEffect(() => {
-    const value = readPreferences(user?.unsafeMetadata?.opravovna);
-    preferencesRef.current = value;
-    setPreferences(value);
-  }, [user?.id]);
-  async function persistPreferences(patch: Partial<Preferences>) {
-    if (!user) throw new Error("Prihláste sa.");
-    const value = { ...preferencesRef.current, ...patch };
-    preferencesRef.current = value;
-    setPreferences(value);
-    const pending = preferenceQueue.current
-      .catch(() => {})
-      .then(() =>
-        user.update({
-          unsafeMetadata: { ...user.unsafeMetadata, opravovna: value },
-        }),
-      );
-    preferenceQueue.current = pending;
-    await pending;
-  }
-  const projectPreferences = preferences.projects[projectId] ?? {
-    categories: [],
-    sort: "name" as const,
-  };
-  const categories = projectPreferences.categories;
-  function setProjectPreferences(patch: Partial<typeof projectPreferences>) {
-    persistPreferences({
-      projects: {
-        ...preferencesRef.current.projects,
-        [projectId]: {
-          ...(preferencesRef.current.projects[projectId] ?? {
-            categories: [],
-            sort: "name",
-          }),
-          ...patch,
-        },
+    const user = userRef.current;
+    if (!user) {
+      controller.current = null;
+      return;
+    }
+    const accountId = user.id;
+    let storage: Storage | undefined;
+    try {
+      storage = window.localStorage;
+    } catch {}
+    let pending = readPendingPreferences(storage, accountId);
+    let value = readPreferences(
+      mergePreferencePatch(
+        readPreferences(user.unsafeMetadata?.opravovna),
+        pending,
+      ),
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let saving: Promise<void> | undefined;
+    let generation = 0;
+    let stopped = false;
+    const publish = () => {
+      if (stopped) return;
+      if (controller.current?.accountId === accountId)
+        controller.current.value = value;
+      setState({ accountId, value });
+    };
+    function flush(): Promise<void> {
+      clearTimeout(timer);
+      if (saving) return saving;
+      saving = (async () => {
+        while (!stopped && Object.keys(pending).length) {
+          const version = generation;
+          await user!.update({
+            unsafeMetadata: { ...user!.unsafeMetadata, opravovna: value },
+          });
+          if (version === generation) {
+            pending = {};
+            cachePendingPreferences(storage, accountId, pending);
+          }
+        }
+      })().finally(() => {
+        saving = undefined;
+      });
+      return saving;
+    }
+    const sync = () => flush().catch((error) => reportRef.current(error));
+    controller.current = {
+      accountId,
+      value,
+      async update(patch, immediate) {
+        pending = mergePreferencePatch(pending, patch);
+        value = readPreferences(mergePreferencePatch(value, patch));
+        generation++;
+        cachePendingPreferences(storage, accountId, pending);
+        publish();
+        clearTimeout(timer);
+        if (immediate) await flush();
+        else timer = setTimeout(sync, 400);
       },
-    }).catch(report);
+    };
+    publish();
+    if (Object.keys(pending).length) void sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      window.removeEventListener("online", sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, [accountId]);
+  const preferences =
+    state.accountId === user?.id ? state.value : readPreferences({});
+  async function persistPreferences(patch: Partial<Preferences>) {
+    const current = controller.current;
+    if (!user || current?.accountId !== user.id)
+      throw new Error("Prihláste sa.");
+    await current.update(patch, true);
+  }
+  const projectPreferences =
+    (projectId && preferences.projects[projectId]) ||
+    defaultProjectPreferences();
+  function setProjectPreferences(patch: Partial<ProjectPreferences>) {
+    const current = controller.current;
+    if (!projectId || !user || current?.accountId !== user.id) return;
+    current
+      .update(
+        {
+          projects: {
+            [projectId]: {
+              ...(current.value.projects[projectId] ??
+                defaultProjectPreferences()),
+              ...patch,
+            },
+          },
+        },
+        false,
+      )
+      .catch(report);
   }
   function setCategories(value: string[]) {
     setProjectPreferences({ categories: value });
   }
-
   return {
     preferences,
     persistPreferences,
     projectPreferences,
-    categories,
+    categories: projectPreferences.categories,
     setProjectPreferences,
     setCategories,
   };
