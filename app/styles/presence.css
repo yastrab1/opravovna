@@ -106,3 +106,14 @@
   text-align: left;
   overflow-wrap: anywhere;
 }
+.presence-tooltip-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (max-width: 620px) {
+  .presence-tooltip {
+    max-width: 160px;
+  }
+}

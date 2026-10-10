@@ -20,7 +20,7 @@ function Avatar({
       className="presence-person"
       disabled={busy}
       onClick={() => onFollow(viewer)}
-      aria-label={`${viewer.name}, prejsť na otvorené riešenie`}
+      aria-label={`${viewer.name}, ${viewer.documentId ? "prejsť na otvorené riešenie" : "projekt otvorený, riešenie zatiaľ nezdieľa"}`}
     >
       {viewer.image && failedImage !== viewer.image ? (
         // Clerk profile pictures are already hosted and resized by Clerk.
@@ -38,6 +38,11 @@ function Avatar({
       )}
       <span className="presence-tooltip" aria-hidden="true">
         {viewer.name}
+        <span className="presence-tooltip-note">
+          {viewer.documentId
+            ? "Kliknutím prejsť na riešenie"
+            : "Projekt otvorený, riešenie zatiaľ nezdieľa"}
+        </span>
       </span>
     </button>
   );
@@ -147,7 +152,9 @@ export default function ProjectViewers({
       if (!person)
         throw new Error("Používateľ už nemá tento projekt otvorený.");
       if (!person.documentId)
-        throw new Error("Používateľ práve nemá otvorené riešenie.");
+        throw new Error(
+          `${person.name} má projekt otvorený, ale jeho karta neposiela aktuálne riešenie. Nech obnoví stránku.`,
+        );
       await onOpenDocument(person.documentId);
     } catch (error) {
       if (!abort.signal.aborted) onError(error);
