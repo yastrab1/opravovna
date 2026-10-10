@@ -173,6 +173,7 @@ try {
   const points = JSON.parse(await output.file("/points.json").async("string"));
   assert.equal(points.scores["1"].points, 4.67);
   assert.equal(points.scores["3"], undefined);
+  assert.deepEqual(points.opravovna.submissions["1"], ["kontrola"]);
   assert.deepEqual(points.scores["1"].comments, ["4.67B"]);
   const flatBytes = await output
       .file(documents[1].path.split("/").pop())

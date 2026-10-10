@@ -77,86 +77,92 @@ export default function ToolSettings({
           }
         }}
       >
-        <h2>Predvolené nástroje</h2>
-        <label>
-          Nástroj
-          <select
-            value={tool}
-            onChange={(e) => setTool(e.target.value as ToolKey)}
-          >
-            {Object.entries(toolNames).map(([key, name]) => (
-              <option value={key} key={key}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Farba
-          <input
-            type="color"
-            value={value.color}
-            onChange={(e) => change({ color: e.target.value })}
-          />
-        </label>
-        {["text", "stamp"].includes(tool) ? (
-          <>
-            <label>
-              Písmo
-              <select
-                value={value.font}
-                onChange={(e) => change({ font: e.target.value })}
-              >
-                {fonts.map((font) => (
-                  <option key={font}>{font}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Veľkosť písma
-              <input
-                type="number"
-                min="8"
-                max="120"
-                required
-                value={value.fontSize}
-                onChange={(e) => change({ fontSize: +e.target.value })}
-              />
-            </label>
-            <div className="settingschecks">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={value.bold}
-                  onChange={(e) => change({ bold: e.target.checked })}
-                />
-                Tučné
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={value.italic}
-                  onChange={(e) => change({ italic: e.target.checked })}
-                />
-                Kurzíva
-              </label>
-            </div>
-          </>
-        ) : (
+        <h2>Predvoľby nástrojov</h2>
+        <div className="settings-tool-picker">
           <label>
-            Hrúbka čiary
+            Upravovaný nástroj
             <select
-              value={value.width}
-              onChange={(e) => change({ width: +e.target.value })}
+              disabled={saving}
+              value={tool}
+              onChange={(e) => setTool(e.target.value as ToolKey)}
             >
-              {[1, 2, 3, 5, 8].map((n) => (
-                <option key={n} value={n}>
-                  {n} px
+              {Object.entries(toolNames).map(([key, name]) => (
+                <option value={key} key={key}>
+                  {name}
                 </option>
               ))}
             </select>
           </label>
-        )}
+        </div>
+        <fieldset className="settingsvalues" disabled={saving}>
+          <legend>Predvolené hodnoty: {toolNames[tool]}</legend>
+          <label>
+            Farba
+            <input
+              type="color"
+              value={value.color}
+              onChange={(e) => change({ color: e.target.value })}
+            />
+          </label>
+          {["text", "stamp"].includes(tool) ? (
+            <>
+              <label>
+                Písmo
+                <select
+                  value={value.font}
+                  onChange={(e) => change({ font: e.target.value })}
+                >
+                  {fonts.map((font) => (
+                    <option key={font}>{font}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Veľkosť písma
+                <input
+                  type="number"
+                  min="8"
+                  max="120"
+                  required
+                  value={value.fontSize}
+                  onChange={(e) => change({ fontSize: +e.target.value })}
+                />
+              </label>
+              <div className="settingschecks">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={value.bold}
+                    onChange={(e) => change({ bold: e.target.checked })}
+                  />
+                  Tučné
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={value.italic}
+                    onChange={(e) => change({ italic: e.target.checked })}
+                  />
+                  Kurzíva
+                </label>
+              </div>
+            </>
+          ) : (
+            <label>
+              Hrúbka čiary
+              <select
+                value={value.width}
+                onChange={(e) => change({ width: +e.target.value })}
+              >
+                {[1, 2, 3, 5, 8].map((n) => (
+                  <option key={n} value={n}>
+                    {n} px
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </fieldset>
         <p className="muted">
           Uložené vo vašom účte. Použijú sa pri výbere nástroja.
         </p>

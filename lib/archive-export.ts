@@ -1,3 +1,4 @@
+import { exportTagMetadata } from "./archive-tags";
 import type JSZip from "jszip";
 
 export function gradedDocuments(documents: any[]) {
@@ -16,6 +17,7 @@ export async function writePoints(
   zip: JSZip,
   sourceZip: JSZip,
   documents: any[],
+  legacy: any = {},
 ) {
   const original = Object.values(sourceZip.files).find(
     (entry) =>
@@ -48,6 +50,7 @@ export async function writePoints(
       comments: scoring.comments ?? [...comments, `${scoring.points}B`],
     };
   }
+  points.opravovna = exportTagMetadata(documents, legacy.tags ?? []);
   // Arnold uses this literal root entry, including its leading slash.
   zip.file("/points.json", JSON.stringify(points, null, 2));
 }

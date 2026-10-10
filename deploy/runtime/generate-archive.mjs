@@ -56,7 +56,12 @@ export async function generateArchive(
   if (failure) throw failure;
   if (isClosing())
     throw new Error("Server sa reštartuje. Skúste export znova.");
-  await writePoints(zip, sourceZip, snapshot.documents);
+  await writePoints(
+    zip,
+    sourceZip,
+    snapshot.documents,
+    snapshot.project.legacy,
+  );
   job.stage = "packing";
   await fs.mkdir(directory, { recursive: true });
   await pipeline(

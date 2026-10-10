@@ -1,3 +1,4 @@
+import { importTagMetadata } from "../archive-tags";
 import { writeImportedVersion } from "./write-version";
 import { uploadArchive } from "./upload-archive";
 import {
@@ -120,6 +121,7 @@ export async function importZip(
         typeof parsed.scores !== "object"
       )
         throw new Error("Neplatný formát points.json.");
+      importTagMetadata(parsed, incomingLegacy);
       pointScores = parsed.scores;
       incomingLegacy.changes ??= {};
       for (const [id, score] of Object.entries(pointScores)) {

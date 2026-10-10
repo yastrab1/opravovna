@@ -44,7 +44,7 @@ export async function exportZipBrowser({
         : originalBytes;
       addGradedPdf(zip, d, out);
     }
-    await writePoints(zip, sourceZip, exportDocs);
+    await writePoints(zip, sourceZip, fresh.documents, fresh.legacy);
     setBusy("Balím archív…");
     download(
       await zip.generateAsync({ type: "blob", compression: "STORE" }),

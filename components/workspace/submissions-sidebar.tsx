@@ -1,4 +1,6 @@
 "use client";
+import PointsFilter from "./points-filter";
+import { emptyPointsFilter } from "@/lib/points-filter";
 import Thumbnail from "@/app/thumbnail";
 import { categoryLabel } from "@/lib/preferences";
 import { tagName } from "@/lib/tags";
@@ -112,6 +114,10 @@ export default function SubmissionsSidebar({
           </select>
         )}
       </div>
+      <PointsFilter
+        value={projectPreferences.points ?? emptyPointsFilter}
+        onChange={(points) => setProjectPreferences({ points })}
+      />
       <details className="categoryfilter">
         <summary>
           Kategórie {categories.length ? `(${categories.length})` : "(všetky)"}

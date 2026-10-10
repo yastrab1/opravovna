@@ -1,3 +1,4 @@
+import { readPointsFilter, type PointsFilter } from "./points-filter";
 export const fonts = [
   "Ubuntu",
   "Open Sans",
@@ -26,7 +27,10 @@ export type ToolStyle = {
 };
 export type Preferences = {
   tools: Record<ToolKey, ToolStyle>;
-  projects: Record<string, { categories: string[]; sort: "name" | "graded" }>;
+  projects: Record<
+    string,
+    { categories: string[]; sort: "name" | "graded"; points?: PointsFilter }
+  >;
 };
 export function categoryLabel(code: string) {
   const value = String(code).replace(/^c/i, "").toLowerCase();
@@ -86,6 +90,7 @@ export function readPreferences(raw: any): Preferences {
         ? v.categories.filter((x: any) => typeof x === "string")
         : [],
       sort: v?.sort === "graded" ? "graded" : "name",
+      points: readPointsFilter(v?.points),
     };
   }
   return { tools, projects };

@@ -1,4 +1,5 @@
 "use client";
+import { matchesPoints, emptyPointsFilter } from "@/lib/points-filter";
 import { useAccountPreferences } from "@/hooks/use-account-preferences";
 import { useProjectSession } from "@/hooks/use-project-session";
 import { api } from "@/lib/client-api";
@@ -140,6 +141,10 @@ export function useWorkspace() {
           `${d.metadata.name} ${d.metadata.submissionId} ${d.metadata.rocnik} ${categoryLabel(d.metadata.rocnik)}`
             .toLowerCase()
             .includes(query.toLowerCase()) &&
+          matchesPoints(
+            d.state.scoring?.points,
+            projectPreferences.points ?? emptyPointsFilter,
+          ) &&
           (!categories.length || categories.includes(d.metadata.rocnik)) &&
           (!tagFilter ||
             d.state.tags.some(

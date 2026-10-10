@@ -9,7 +9,7 @@ A Slovak workspace for teams reviewing competition solutions in PDF. Sign in wit
 - Text comments wrap at the page edge. Freehand drawing, highlighting, images, arrows and shapes; configurable tool defaults saved to the account.
 - Continuous page scrolling, appended blank pages and rotation of an embedded scan while preserving the PDF header.
 - Non-negative decimal grades with no upper limit. Invalid imported grades open a correction dialog before upload; cancel stops the import.
-- Project tags beside thumbnails; category filtering and alphabetical/graded sorting saved to the account.
+- Project tags beside thumbnails; decimal points filters (equal/less/greater), category filtering and alphabetical/graded sorting saved to the account.
 - Explicit next-solution button, removable grading stamps, undo and redo.
 - Automatic saves, five-second synchronization and revision checks to prevent silent overwrites.
 - Merge corrected exports, skip identical submissions, and choose the existing or incoming version for conflicts.
@@ -46,7 +46,7 @@ Submission filenames follow `p<problem>-c<category>-<hyphenated-name>-<submissio
 
 Import understands Arnold MessagePack `changes.arn`, its tag-ID catalog, `points.json`, legacy graded-PDF names and Opravovna version-1 metadata. Numeric strings with a decimal dot or comma are normalized. Invalid scores require a replacement before the archive is uploaded.
 
-Final exports contain only graded PDFs at the ZIP root, with each **original PDF basename preserved**, and Arnold's literal **`/points.json` entry**. The leading slash on this metadata entry matches the supplied Arnold export; it does not create a wrapper folder. Ungraded solutions are omitted. Points metadata preserves scoring criteria and uses submission IDs to match PDFs. Editable annotation sidecars are not included in this final interchange ZIP: annotations are flattened into the PDFs.
+Final exports contain only graded PDFs at the ZIP root, with each **original PDF basename preserved**, and Arnold's literal **`/points.json` entry**. The leading slash on this metadata entry matches the supplied Arnold export; it does not create a wrapper folder. Ungraded solutions are omitted. Points metadata preserves scoring criteria and uses submission IDs to match PDFs. A namespaced `opravovna` field inside `points.json` preserves project tag names, colors and solution assignments for re-import. Arnold grading fields remain unchanged. Editable annotation sidecars are not included in this final interchange ZIP: annotations are flattened into the PDFs.
 
 PDF.js decoder assets (WASM, fallback JavaScript, CMaps and fonts) are copied from the installed version into a versioned public directory during the build. Browser viewers and server export workers use matching assets.
 

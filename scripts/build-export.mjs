@@ -12,6 +12,8 @@ for (const file of [
   "pdf-render",
   "archive",
   "archive-export",
+  "archive-tags",
+  "tags",
 ]) {
   const source = await fs.readFile(`lib/${file}.ts`, "utf8");
   const output = ts

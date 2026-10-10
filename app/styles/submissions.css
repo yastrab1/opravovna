@@ -296,3 +296,26 @@
   flex-shrink: 0;
   font-size: 12px;
 }
+
+.pointsfilter {
+  display: flex;
+  gap: 5px;
+  padding: 0 12px 12px;
+  align-items: center;
+}
+.pointsfilter select {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 6px;
+}
+.pointsfilter input {
+  width: 66px;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px;
+}
+.pointsfilter button {
+  padding: 6px;
+  flex-shrink: 0;
+}
