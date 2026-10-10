@@ -9,7 +9,7 @@
     "jsdom": "^26.1.0",
     "jszip": "3.10.1",
     "miniflare": "^4.20260730.0",
-    "msgpackr": "1.11.5",
+    "msgpackr": "2.1.0",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "^6.2.108"
   },
