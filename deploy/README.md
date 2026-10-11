@@ -4,11 +4,10 @@ The image runs the compiled application on local workerd through Miniflare. D1 a
 
 ## Build
 
-Supply your public Clerk key when building, and keep the secret key in an ignored runtime environment file.
+Use `just deploy` for the checked production workflow. The image builds on r2d2 through the dedicated `opravovna-r2d2` Buildx builder over SSH and pushes directly to GHCR. Package downloads stay cached on the server. Supply your public Clerk key when building, and keep the secret key in an ignored runtime environment file.
 
 ```sh
 node --env-file=.env.production scripts/build-container.mjs ghcr.io/yastrab1/opravovna:production
-docker push ghcr.io/yastrab1/opravovna:production
 ```
 
 Configure `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `APP_ORIGIN` in the runtime environment. The public origin must match your Clerk production domain. Clerk's Google sign-in needs your own OAuth credentials, configured in Clerk and Google Cloud.
