@@ -1,4 +1,6 @@
 "use client";
+import { useWorkspacePermalink } from "./use-workspace-permalink";
+import { writeWorkspaceUrl, type HistoryMode } from "@/lib/workspace-url";
 import { api } from "@/lib/client-api";
 import { collectTags, normalizeArnoldProject } from "@/lib/tags";
 import { useEffect, useRef, useState } from "react";
@@ -8,7 +10,7 @@ export function useProjectSession(
   setSharing: (open: boolean) => void,
 ) {
   const [projects, setProjects] = useState<any[]>([]),
-    [project, setProject] = useState<any>(null),
+    [project, updateProject] = useState<any>(null),
     [active, setActive] = useState<string | null>(null),
     [newTitle, setNewTitle] = useState(""),
     [busy, setBusy] = useState(""),
@@ -29,18 +31,41 @@ export function useProjectSession(
   function report(e: any) {
     setError(typeof e === "string" ? e : e.message);
   }
-  async function open(pid: string) {
-    if (!(await save())) return;
+  function setProject(value: any, mode: HistoryMode = "push") {
+    updateProject(value);
+    if (value === null) {
+      current.current = { project: null, active: null, doc: null };
+      setActive(null);
+      writeWorkspaceUrl(null, mode);
+    }
+  }
+  async function open(
+    pid: string,
+    solution?: string,
+    mode: HistoryMode = "push",
+  ): Promise<boolean> {
+    if (!(await save())) return false;
     setBusy("Načítavam projekt…");
     try {
       const p = normalizeArnoldProject(await api("projects/" + pid));
+      if (solution && !p.documents.some((d: any) => d.id === solution))
+        throw new Error("Riešenie už nie je dostupné v tomto projekte.");
+      const active = solution ?? p.documents[0]?.id ?? null;
+      current.current = {
+        project: p,
+        active,
+        doc: p.documents.find((d: any) => d.id === active),
+      };
       setProject(p);
-      setActive(p.documents[0]?.id ?? null);
+      setActive(active);
+      writeWorkspaceUrl({ project: pid, solution: active }, mode);
       setSharing(false);
       dirty.current = false;
       setSaveStatus("Uložené");
+      return true;
     } catch (e) {
       report(e);
+      return false;
     } finally {
       setBusy("");
     }
@@ -183,20 +208,33 @@ export function useProjectSession(
       clearInterval(id);
     };
   }, [project?.id]);
-  async function switchDoc(id: string) {
+  async function switchDoc(
+    id: string,
+    mode: HistoryMode = "push",
+  ): Promise<boolean> {
     if (await save()) {
-      const project = current.current.project;
+      let project = current.current.project;
+      if (!project) return false;
       if (!project.documents.some((doc: any) => doc.id === id)) {
         const fresh = normalizeArnoldProject(
           await api("projects/" + project.id),
         );
         if (!fresh.documents.some((doc: any) => doc.id === id))
           throw new Error("Riešenie už nie je dostupné.");
+        project = fresh;
         setProject(fresh);
       }
       dirty.current = false;
+      current.current = {
+        project,
+        active: id,
+        doc: project.documents.find((d: any) => d.id === id),
+      };
       setActive(id);
+      writeWorkspaceUrl({ project: project.id, solution: id }, mode);
+      return true;
     }
+    return false;
   }
   async function join() {
     try {
@@ -215,6 +253,14 @@ export function useProjectSession(
       setBusy("");
     }
   }
+  useWorkspacePermalink(isSignedIn, {
+    current,
+    open,
+    switchDoc,
+    save,
+    setProject,
+    report,
+  });
   return {
     projects,
     project,

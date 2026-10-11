@@ -9,6 +9,7 @@ A Slovak workspace for teams reviewing competition solutions in PDF. Sign in wit
 - Text comments wrap at the page edge. Format existing text boxes or selected text, and drag boxes between pages with edge scrolling and undo/redo. Added pages become editable immediately. Freehand drawing, highlighting, images, arrows and shapes; configurable tool defaults saved to the account.
 - Continuous page scrolling, appended blank pages and rotation of an embedded scan while preserving the PDF header.
 - Non-negative decimal grades with no upper limit. Invalid imported grades open a correction dialog before upload; cancel stops the import.
+- Each open solution updates the address bar to `/?project=<id>&solution=<id>`. Copy this link to share it with project members; it survives reloads and restarts, waits for sign-in and supports browser Back/Forward.
 - Live project viewers beside Settings, with profile photos and names on hover or keyboard focus. Click a reviewer to open their latest focused solution, saving your own edits first. Multiple tabs count once; abandoned sessions expire automatically.
 - Project tags beside thumbnails; search, grading status, tag/category selection, decimal points filters (equal/less/greater), and sorting saved per project to the account. Unsynced edits survive immediate reloads in an account-specific local backup and retry when the connection returns.
 - Explicit next-solution button, removable grading stamps, undo and redo.

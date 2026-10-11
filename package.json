@@ -13,7 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "dev:hot": "node scripts/run-framework.mjs dev",
-    "test": "node --experimental-strip-types tests/api.mjs && node tests/document-version.mjs && node --experimental-strip-types tests/merge.mjs && node tests/archive-tags.mjs && node --experimental-strip-types tests/points-filter.mjs && node tests/preferences.mjs && node tests/presence.mjs && node --experimental-strip-types tests/import-scores.mjs && node --experimental-strip-types tests/client-api.mjs && node tests/text-wrap.mjs && node tests/pdf-render.mjs && node tests/pdf-assets.mjs",
+    "test": "node --experimental-strip-types tests/api.mjs && node tests/document-version.mjs && node --experimental-strip-types tests/merge.mjs && node tests/archive-tags.mjs && node --experimental-strip-types tests/points-filter.mjs && node tests/preferences.mjs && node tests/workspace-url.mjs && node tests/presence.mjs && node --experimental-strip-types tests/import-scores.mjs && node --experimental-strip-types tests/client-api.mjs && node tests/text-wrap.mjs && node tests/pdf-render.mjs && node tests/pdf-assets.mjs",
     "test:export": "node tests/export.mjs",
     "check": "tsc --noEmit",
     "format": "prettier --write app components hooks db lib deploy/runtime scripts tests",

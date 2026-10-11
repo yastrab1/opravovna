@@ -16,7 +16,7 @@ export default function WorkspaceHeader({
 }: {
   projectId?: string;
   documentId?: string | null;
-  onOpenDocument: (id: string) => Promise<void>;
+  onOpenDocument: (id: string) => Promise<unknown>;
   busy: boolean;
   onError: (error: unknown) => void;
   isSignedIn: boolean | undefined;
