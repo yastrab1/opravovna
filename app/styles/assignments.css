@@ -90,14 +90,23 @@ button.collaborator-trigger {
   color: var(--ink);
 }
 .collaborator-menu {
-  margin-top: 5px;
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  flex-direction: column;
   border: 1px solid var(--line);
   background: var(--bg);
   border-radius: 5px;
   overflow: hidden;
   box-shadow: 0 6px 18px oklch(10% 0.015 245 / 0.25);
 }
+.collaborator-menu:popover-open {
+  display: flex;
+}
 .collaborator-search {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -116,7 +125,7 @@ button.collaborator-trigger {
   outline-offset: 0;
 }
 .collaborator-options {
-  max-height: 225px;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px;
 }

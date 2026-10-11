@@ -1,4 +1,5 @@
 "use client";
+import { useFloatingPopover } from "@/hooks/use-floating-popover";
 import { ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 export type Collaborator = { email: string; name: string; firstName?: string };
@@ -19,7 +20,9 @@ export default function CollaboratorSelect({
     [query, setQuery] = useState("");
   const root = useRef<HTMLDivElement>(null),
     trigger = useRef<HTMLButtonElement>(null),
-    search = useRef<HTMLInputElement>(null);
+    search = useRef<HTMLInputElement>(null),
+    panel = useRef<HTMLDivElement>(null);
+  useFloatingPopover(open, trigger, panel);
   const id = useId();
   const selected = people.filter(
     (person) => person.firstName && value.includes(person.email),
@@ -54,7 +57,14 @@ export default function CollaboratorSelect({
         }
       }}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        // Native label activation can focus the enclosing modal before its input.
+        // Outside pointer presses are already handled separately.
+        if (
+          event.relatedTarget &&
+          event.relatedTarget !== event.currentTarget.closest("dialog") &&
+          !event.currentTarget.contains(event.relatedTarget)
+        )
+          setOpen(false);
       }}
     >
       <button
@@ -94,7 +104,7 @@ export default function CollaboratorSelect({
         <ChevronDown size={15} />
       </button>
       {open && (
-        <div className="collaborator-menu" id={id}>
+        <div ref={panel} popover="manual" className="collaborator-menu" id={id}>
           <div className="collaborator-search">
             <Search size={15} />
             <input

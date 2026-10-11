@@ -40,13 +40,6 @@ export default function AssignmentDialog({
       canceled = true;
     };
   }, [project.id]);
-  const selected = Object.entries(selection).some(
-    ([category, emails]) =>
-      categories.includes(category) &&
-      emails.some((email) =>
-        people.some((p) => p.email === email && p.firstName),
-      ),
-  );
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -139,11 +132,7 @@ export default function AssignmentDialog({
             disabled={loading || !people.length || saving}
             type="submit"
           >
-            {saving
-              ? "Priraďujem…"
-              : selected
-                ? "Priradiť"
-                : "Odstrániť všetky priradenia"}
+            {saving ? "Prerozdeľujem…" : "Prerozdeliť od začiatku"}
           </button>
         </div>
       </form>
