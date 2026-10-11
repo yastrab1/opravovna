@@ -66,6 +66,7 @@ const state = {
   ],
 };
 const documents = Array.from({ length: 4 }, (_, i) => ({
+  id: `document-${i}`,
   path: `4-priklad/p4-c8-user-${i}-${i + 1}.pdf`,
   original: "file-" + i,
   metadata: { submissionId: String(i + 1), folder: "4-priklad" },
@@ -77,6 +78,14 @@ const documents = Array.from({ length: 4 }, (_, i) => ({
         ? { ...state, rotations: {}, extraPages: 1 }
         : structuredClone(state),
 }));
+// Arnold can store an empty stamp size. Native canvas must use the text
+// default rather than fail the entire project, without rewriting the state.
+documents[3].state.changes[0].data.fontSize = "";
+documents[3].state.changes[0].data.fontFamily = "Helvetica";
+documents[3].state.changes[0].data.styles = {
+  0: { 0: { fontSize: "", fill: "#c02080" }, 1: { fontSize: "23.5" } },
+};
+const initialState = JSON.stringify(documents[3].state);
 for (const doc of documents) {
   zip.file(doc.path, bytes);
   objects.set(doc.original, bytes);
@@ -153,6 +162,7 @@ try {
   assert.equal(job.status, "ready", job.error);
   assert.equal(job.completed, 3);
   assert.equal(job.threads, 2);
+  assert.equal(JSON.stringify(documents[3].state), initialState);
   const response = await call("/jobs/" + job.id + "/download");
   assert.equal(response.status, 200);
   const output = await JSZip.loadAsync(await response.arrayBuffer());
@@ -222,6 +232,11 @@ try {
   ];
   const failed = await wait(await (await create()).json());
   assert.equal(failed.status, "error");
+  assert.deepEqual(failed.failedSolution, {
+    id: documents[0].id,
+    path: documents[0].path,
+    label: documents[0].path.split("/").pop(),
+  });
   assert.equal(
     (await call("/jobs/" + failed.id + "/download")).status,
     409,

@@ -47,7 +47,14 @@ export async function generateArchive(
           addGradedPdf(zip, document, output);
           job.completed++;
         } catch (error) {
-          failure = error;
+          if (!failure) {
+            failure = error;
+            job.failedSolution = {
+              id: document.id,
+              path: document.path,
+              label: document.metadata?.name || document.path.split("/").pop(),
+            };
+          }
         }
       }
     },

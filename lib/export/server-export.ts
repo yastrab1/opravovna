@@ -32,7 +32,15 @@ export async function exportZip({
     let failures = 0;
     while (job.status !== "ready") {
       if (job.status === "error")
-        throw new Error(job.error || "Export zlyhal. Skúste ho znova.");
+        throw Object.assign(
+          new Error(job.error || "Export zlyhal. Skúste ho znova."),
+          {
+            failedSolution: job.failedSolution && {
+              ...job.failedSolution,
+              project: project.id,
+            },
+          },
+        );
       setBusy(
         job.status === "queued"
           ? "Export čaká na server…"

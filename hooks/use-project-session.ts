@@ -16,6 +16,7 @@ export function useProjectSession(
     [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [saveStatus, setSaveStatus] = useState("Uložené");
+  const [errorSolution, setErrorSolution] = useState<any>(null);
   const current = useRef<any>(null),
     dirty = useRef(false),
     saving = useRef<Promise<any> | null>(null),
@@ -29,6 +30,7 @@ export function useProjectSession(
     setProjects(await api("projects"));
   }
   function report(e: any) {
+    setErrorSolution(e?.failedSolution ?? null);
     setError(typeof e === "string" ? e : e.message);
   }
   function setProject(value: any, mode: HistoryMode = "push") {
@@ -163,7 +165,12 @@ export function useProjectSession(
   }, [isSignedIn]);
   useEffect(() => {
     const unload = (e: BeforeUnloadEvent) => {
-      if (dirty.current || busyRef.current || mergePending.current) {
+      if (
+        dirty.current ||
+        saving.current ||
+        busyRef.current ||
+        mergePending.current
+      ) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -271,6 +278,7 @@ export function useProjectSession(
     busy,
     setBusy,
     error,
+    errorSolution,
     setError,
     saveStatus,
     current,

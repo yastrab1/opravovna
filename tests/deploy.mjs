@@ -39,12 +39,25 @@ const run = async (mode) => {
     stack + "/data/opravovna/state.sqlite",
   ]);
   assert.equal(db.status, 0);
+  await writeFile(
+    stack + "/data/opravovna/example.pdf",
+    "%PDF-synthetic-backup",
+  );
+  if (mode === "missing-blob") {
+    const setup = spawnSync("python3", [
+      "-c",
+      "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute('create table _mf_objects(key,blob_id,size)'); db.execute(\"insert into _mf_objects values('pdf','missing-blob',3)\"); db.commit()",
+      stack + "/data/opravovna/state.sqlite",
+    ]);
+    assert.equal(setup.status, 0);
+  }
   const initial = `services:\n  opravovna:\n    image: ${old}\n`;
   await writeFile(stack + "/personal-project.compose.yml", initial);
   const env = {
     ...process.env,
     PATH: directory + "/bin:" + process.env.PATH,
     DEPLOY_STACK: stack,
+    DEPLOY_BACKUP_ROOT: stack + "/backups/opravovna",
     DEPLOY_ENV_FILE: directory + "/missing.env",
     DEPLOY_ORIGIN: mode === "health-fail" ? origin + "/health-fail" : origin,
     DEPLOY_TEST_LOG: stack + "/commands.jsonl",
@@ -78,6 +91,17 @@ const run = async (mode) => {
       ),
       "Consistent SQLite backup missing",
     );
+    const backup = (await readdir(stack + "/backups/opravovna"))[0];
+    const state = stack + "/backups/opravovna/" + backup + "/state";
+    assert.equal(
+      await readFile(state + "/example.pdf", "utf8"),
+      "%PDF-synthetic-backup",
+    );
+    const manifest = JSON.parse(
+      await readFile(state + "/manifest.json", "utf8"),
+    );
+    assert.match(manifest["example.pdf"].sha256, /^[a-f0-9]{64}$/);
+    assert(manifest["state.sqlite"]);
   }
   if (mode === "rollback" || mode === "health-fail") {
     assert.notEqual(status, 0);
@@ -87,6 +111,14 @@ const run = async (mode) => {
         .length,
       2,
       "Failed startup must restore and restart previous image",
+    );
+  }
+  if (mode === "missing-blob") {
+    assert.notEqual(status, 0);
+    assert.equal(compose, initial);
+    assert(
+      !commands.some((c) => c.command === "docker" && c.args[0] === "compose"),
+      "Incomplete backup must abort before restarting the app",
     );
   }
   if (mode === "dirty") {
@@ -103,6 +135,7 @@ try {
   await run("rollback");
   await run("health-fail");
   await run("dirty");
+  await run("missing-blob");
   console.log(
     "PASS: one-command deployment checks, digest pinning, backups, health checks, startup rollback and dirty-tree rejection with isolated command shims",
   );

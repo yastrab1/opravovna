@@ -1,4 +1,33 @@
 import { validateAnnotationImages } from "./annotation-images";
+
+function normalizeFontSize(style: any) {
+  if (!Object.hasOwn(style, "fontSize")) return;
+  const size =
+    typeof style.fontSize === "number" ||
+    (typeof style.fontSize === "string" && style.fontSize.trim())
+      ? Number(style.fontSize)
+      : NaN;
+  // Empty sizes occur in Arnold stamps. Use Fabric's default/inherited size
+  // instead of passing an invalid CSS font to the native export renderer.
+  if (Number.isFinite(size) && size > 0) style.fontSize = size;
+  else delete style.fontSize;
+}
+
+function normalizeTextFonts(data: any) {
+  normalizeFontSize(data);
+  if (data.styles && typeof data.styles === "object") {
+    data.styles = structuredClone(data.styles);
+    for (const line of Object.values(data.styles) as any[])
+      for (const style of Object.values(line) as any[])
+        if (style && typeof style === "object") normalizeFontSize(style);
+  }
+  if (Array.isArray(data.objects))
+    data.objects = data.objects.map((child: any) => {
+      const copy = { ...child };
+      normalizeTextFonts(copy);
+      return copy;
+    });
+}
 export function legacyToFabric(change: any) {
   const d = { ...change.data };
   const t = change.type;
@@ -19,6 +48,7 @@ export function legacyToFabric(change: any) {
   // Fabric 6 uses centered origins only when explicitly specified; legacy uses top/left.
   d.originX ??= "left";
   d.originY ??= "top";
+  normalizeTextFonts(d);
   if (typeof d.fill === "string" && /^#[0-9a-f]{8}$/i.test(d.fill))
     d.fill = cssColor(d.fill);
   if (typeof d.stroke === "string" && /^#[0-9a-f]{8}$/i.test(d.stroke))

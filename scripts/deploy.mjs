@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const run = (command, args, capture = false) => {
   const result = spawnSync(command, args, {
@@ -42,10 +42,13 @@ const revision = run("git", ["rev-parse", "--short=12", "HEAD"], true);
 const host = process.env.DEPLOY_HOST || "r2d2@r2d2";
 const stack = process.env.DEPLOY_STACK || "/home/r2d2/unified";
 const image = process.env.DEPLOY_IMAGE || "ghcr.io/yastrab1/opravovna";
+const backupRoot =
+  process.env.DEPLOY_BACKUP_ROOT || "/mnt/data/backups/opravovna";
 const origin = process.env.DEPLOY_ORIGIN || "https://opravovna.tech";
 if (
   !/^[\w.@-]+$/.test(host) ||
   !/^\/[\w/.-]+$/.test(stack) ||
+  !/^\/[\w/.-]+$/.test(backupRoot) ||
   !/^[\w./-]+$/.test(image)
 )
   throw new Error("Invalid deployment host, stack or image.");
@@ -58,23 +61,20 @@ if (!digest) throw new Error("Registry did not return an image digest.");
 const pinned = `${image}@${digest}`;
 run("ssh", ["-o", "BatchMode=yes", host, "docker", "pull", pinned]);
 const remote = `
-import pathlib, re, shutil, sqlite3, subprocess, urllib.request, time, sys
+import pathlib, re, shutil, subprocess, urllib.request, time
 stack=pathlib.Path(${JSON.stringify(stack)})
 compose=stack/'personal-project.compose.yml'
 original=compose.read_text()
 pattern=r'(?m)^(    image: )'+re.escape(${JSON.stringify(image)})+r'@sha256:[a-f0-9]{64}$'
 updated,count=re.subn(pattern,lambda m:m.group(1)+${JSON.stringify(pinned)},original)
 if count!=1: raise RuntimeError('Expected exactly one pinned Opravovna service')
-backup=stack/'backups'/'opravovna'/('deploy-${revision}-'+str(int(time.time())))
-backup.mkdir(parents=True)
+if ${JSON.stringify(backupRoot)}.startswith('/mnt/data/') and not pathlib.Path('/mnt/data').is_mount(): raise RuntimeError('Backup data disk is not mounted')
+backup=pathlib.Path(${JSON.stringify(backupRoot)})/('deploy-${revision}-'+str(int(time.time())))
+backup.mkdir(parents=True,mode=0o700)
 shutil.copy2(compose,backup/compose.name)
-for source in (stack/'data'/'opravovna').rglob('*.sqlite'):
-    relative=source.relative_to(stack/'data'/'opravovna')
-    target=backup/'sqlite'/relative
-    target.parent.mkdir(parents=True,exist_ok=True)
-    with sqlite3.connect(source.as_uri()+'?mode=ro',uri=True) as src, sqlite3.connect(target) as dst:
-        src.backup(dst)
-        if dst.execute('pragma integrity_check').fetchone()[0]!='ok': raise RuntimeError('Invalid database backup')
+backup_namespace={'__name__':'backup_module'}
+exec(${JSON.stringify(readFileSync("scripts/backup-state.py", "utf8"))}, backup_namespace)
+backup_namespace['backup_state'](stack/'data'/'opravovna',backup/'state')
 command=['docker','compose','-f','docker-compose.apps.yml','-f','docker-compose.config-api.yml','up','-d','--no-deps','opravovna']
 def healthy():
     for attempt in range(30):
@@ -93,7 +93,7 @@ except Exception:
     subprocess.run(command,cwd=stack,check=True)
     if not healthy():raise RuntimeError('Rollback also failed health checks')
     raise
-print('Deployment healthy; rollback configuration and SQLite backups:',backup)
+print('Deployment healthy; rollback configuration and verified full state backup:',backup)
 `;
 const result = spawnSync("ssh", ["-o", "BatchMode=yes", host, "python3", "-"], {
   input: remote,

@@ -126,6 +126,7 @@ try {
   assert.equal(exportRequest.headers.get("x-export-owner"), viewer.userId);
   const exportSnapshot = await exportRequest.json();
   assert.equal(exportSnapshot.project.id, pid);
+  assert.ok(exportSnapshot.documents[0].id);
   assert.equal(exportSnapshot.documents[0].metadata.submissionId, "41803");
   assert.ok(exportSnapshot.documents[0].original);
   assert.equal(

@@ -37,7 +37,7 @@ Only one app instance should write to a given data directory. Do not run a secon
 - `data/opravovna/`: database and PDF/archive blobs. For an existing Wrangler migration, use the contents of `.wrangler/state/v3`, preserving binding IDs.
 - `secrets/opravovna.env`: runtime Clerk keys, readable only by the service account.
 - `secrets/opravovna-tunnel/`: tunnel-specific credentials and ingress configuration.
-- `backups/opravovna/`: protected snapshots kept outside the repository.
+- `/mnt/data/backups/opravovna/`: full verified PDF/archive and database backups on the data disk, kept outside the repository.
 
 Stop the app before copying the complete data directory to obtain a consistent snapshot of SQLite WAL files and blob metadata. Back up secrets separately. Restore the entire snapshot with UID/GID 1000 ownership, then start the app. Keep database, keys and image compatible when rolling back an authentication migration.
 

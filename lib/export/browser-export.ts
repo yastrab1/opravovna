@@ -33,16 +33,30 @@ export async function exportZipBrowser({
     for (let i = 0; i < exportDocs.length; i++) {
       const d = exportDocs[i];
       setBusy(`Exportujem PDF… ${i + 1} / ${exportDocs.length}`);
-      const original = await fetch(
-        `/api/projects/${pid}/documents/${d.id}/file`,
-      );
-      if (!original.ok) throw new Error("Pôvodné PDF sa nepodarilo načítať.");
-      const originalBytes = new Uint8Array(await original.arrayBuffer());
-      const changed = hasPdfEdits(d.state);
-      const out = changed
-        ? await flattenPdf(originalBytes, d.state)
-        : originalBytes;
-      addGradedPdf(zip, d, out);
+      try {
+        const original = await fetch(
+          `/api/projects/${pid}/documents/${d.id}/file`,
+        );
+        if (!original.ok) throw new Error("Pôvodné PDF sa nepodarilo načítať.");
+        const originalBytes = new Uint8Array(await original.arrayBuffer());
+        const changed = hasPdfEdits(d.state);
+        const out = changed
+          ? await flattenPdf(originalBytes, d.state)
+          : originalBytes;
+        addGradedPdf(zip, d, out);
+      } catch (error) {
+        throw Object.assign(
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            failedSolution: {
+              project: pid,
+              id: d.id,
+              path: d.path,
+              label: d.metadata?.name || d.path.split("/").pop(),
+            },
+          },
+        );
+      }
     }
     await writePoints(zip, sourceZip, fresh.documents, fresh.legacy);
     setBusy("Balím archív…");

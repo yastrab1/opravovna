@@ -37,7 +37,7 @@ parentPort.on("message", async ({ id, bytes, state }) => {
     });
     parentPort.postMessage({ id, bytes: output }, [output.buffer]);
   } catch (error) {
-    console.error("PDF export failed:", error.message);
+    console.error("PDF export failed:", error.stack ?? error.message);
     parentPort.postMessage({
       id,
       error: "PDF sa nepodarilo exportovať. Skontrolujte anotácie riešenia.",

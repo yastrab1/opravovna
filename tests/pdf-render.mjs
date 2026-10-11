@@ -159,6 +159,33 @@ try {
     legacyToFabric({ type: "Text", data: { text: "4.67B" } }).originX,
     "left",
   );
+  for (const invalid of ["", " ", null, 0, -3, "invalid"]) {
+    const change = {
+      type: "Text",
+      data: {
+        fontSize: invalid,
+        styles: { 0: { 0: { fontSize: invalid, fill: "red" } } },
+      },
+    };
+    const normalized = legacyToFabric(change);
+    assert.equal(Object.hasOwn(normalized, "fontSize"), false);
+    assert.deepEqual(normalized.styles[0][0], { fill: "red" });
+    assert.equal(change.data.fontSize, invalid);
+    assert.equal(change.data.styles[0][0].fontSize, invalid);
+  }
+  assert.equal(
+    legacyToFabric({ type: "Text", data: { fontSize: "23.5" } }).fontSize,
+    23.5,
+  );
+  const rich = {
+    type: "Text",
+    data: { styles: { 0: { 0: { fontSize: "23.5", fill: "blue" } } } },
+  };
+  assert.deepEqual(legacyToFabric(rich).styles[0][0], {
+    fontSize: 23.5,
+    fill: "blue",
+  });
+  assert.equal(rich.data.styles[0][0].fontSize, "23.5");
   assert.equal(
     fabricToLegacy(
       { type: "rect", toObject: () => ({ width: 10, height: 20 }) },

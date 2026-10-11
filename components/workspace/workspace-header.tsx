@@ -32,7 +32,6 @@ export default function WorkspaceHeader({
         Opravovňa<span className="beta">PDF</span>
       </Link>
       <div className="headerend">
-        <span className="muted desktop">Priestor na dobrú spätnú väzbu</span>
         {isSignedIn ? (
           <>
             <ProjectViewers

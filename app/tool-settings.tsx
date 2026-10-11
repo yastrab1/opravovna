@@ -37,12 +37,10 @@ export default function ToolSettings({
   const [draft, setDraft] = useState(tools),
     [tool, setTool] = useState<ToolKey>("text"),
     [saving, setSaving] = useState(false),
-    [error, setError] = useState(""),
-    [saved, setSaved] = useState(false);
+    [error, setError] = useState("");
   const value = draft[tool];
   function change(patch: any) {
     setDraft({ ...draft, [tool]: { ...value, ...patch } });
-    setSaved(false);
   }
   return (
     <details
@@ -51,7 +49,6 @@ export default function ToolSettings({
       onToggle={(e) => {
         if (e.currentTarget.open) {
           setDraft(tools);
-          setSaved(false);
           setError("");
         }
       }}
@@ -69,7 +66,10 @@ export default function ToolSettings({
           setError("");
           try {
             await onSave(draft);
-            setSaved(true);
+            if (menu.current) {
+              menu.current.open = false;
+              menu.current.querySelector("summary")?.focus();
+            }
           } catch (e: any) {
             setError(e.message ?? "Nastavenia sa nepodarilo uložiť.");
           } finally {
@@ -167,14 +167,12 @@ export default function ToolSettings({
           Uložené vo vašom účte. Použijú sa pri výbere nástroja.
         </p>
         {error && <p role="alert">{error}</p>}
-        {saved && <p role="status">Nastavenia uložené.</p>}
         <div className="settingsactions">
           <button
             type="button"
             disabled={saving}
             onClick={() => {
               setDraft({ ...draft, [tool]: defaultStyle(tool) });
-              setSaved(false);
             }}
           >
             Obnoviť nástroj

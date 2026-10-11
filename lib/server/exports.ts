@@ -25,7 +25,7 @@ export async function handleExports({
     if (req.method === "POST" && !p[3]) {
       const documents = (
         await DB.prepare(
-          "SELECT path,original,metadata,state,revision FROM documents WHERE project=? ORDER BY path",
+          "SELECT id,path,original,metadata,state,revision FROM documents WHERE project=? ORDER BY path",
         )
           .bind(project.id)
           .all()

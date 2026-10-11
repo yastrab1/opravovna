@@ -1,4 +1,5 @@
 "use client";
+import ErrorSolutionLink from "@/components/workspace/error-solution-link";
 import { useEffect, useState } from "react";
 import AssignmentDialog from "@/components/workspace/assignment-dialog";
 import GradingSidebar from "@/components/workspace/grading-sidebar";
@@ -29,6 +30,7 @@ export default function Workspace() {
     preferences,
     persistPreferences,
     error,
+    errorSolution,
     saveStatus,
     current,
     dirty,
@@ -107,6 +109,7 @@ export default function Workspace() {
       {error && (
         <div role="alert" className="notice error">
           <span>{error}</span>
+          <ErrorSolutionLink solution={errorSolution} open={open} />
           {saveStatus === "Konflikt zmien" && (
             <>
               <button

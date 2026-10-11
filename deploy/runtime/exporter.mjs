@@ -41,6 +41,7 @@ export function createExporter(getBucket, options = {}) {
     stage: job.stage,
     percent: job.percent,
     error: job.error,
+    failedSolution: job.failedSolution,
     filename: job.filename,
     threads,
   });
