@@ -19,10 +19,8 @@ export default function CollaboratorSelect({
   const [open, setOpen] = useState(false),
     [query, setQuery] = useState("");
   const root = useRef<HTMLDivElement>(null),
-    trigger = useRef<HTMLButtonElement>(null),
-    search = useRef<HTMLInputElement>(null),
-    panel = useRef<HTMLDivElement>(null);
-  useFloatingPopover(open, trigger, panel);
+    search = useRef<HTMLInputElement>(null);
+  const { trigger, panel } = useFloatingPopover(open);
   const id = useId();
   const selected = people.filter(
     (person) => person.firstName && value.includes(person.email),

@@ -1,11 +1,9 @@
-import { useLayoutEffect, type RefObject } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 // A native top-layer popover stays above the modal's scrolling content.
-export function useFloatingPopover(
-  open: boolean,
-  anchor: RefObject<HTMLElement | null>,
-  panel: RefObject<HTMLElement | null>,
-) {
+export function useFloatingPopover(open: boolean) {
+  const anchor = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = panel.current;
     if (!open || !element || !anchor.current) return;
@@ -42,5 +40,6 @@ export function useFloatingPopover(
       window.visualViewport?.removeEventListener("resize", position);
       window.visualViewport?.removeEventListener("scroll", position);
     };
-  }, [open, anchor, panel]);
+  }, [open]);
+  return { trigger: anchor, panel };
 }
