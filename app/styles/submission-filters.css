@@ -111,38 +111,6 @@
 .project-tag-option > button:last-child:hover {
   color: var(--danger);
 }
-.assignment-categories {
-  display: grid;
-  gap: 16px;
-  max-height: 55vh;
-  overflow: auto;
-  margin: 16px 0;
-}
-.assignment-categories fieldset {
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 10px 12px;
-  display: grid;
-  gap: 8px;
-}
-.assignment-categories legend {
-  padding: 0 6px;
-  font-size: 13px;
-}
-.assignment-person {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  font-size: 12px;
-}
-.assignment-person input {
-  accent-color: var(--accent);
-}
-.assignment-person small {
-  display: block;
-  color: var(--muted);
-  font-size: 10px;
-}
 .dialogactions {
   display: flex;
   justify-content: flex-end;
