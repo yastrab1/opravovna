@@ -3,7 +3,7 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1 WRANGLER_SEND_METRICS=false CLOUDFLARE_CF_FETCH_ENABLED=false
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev --include=optional --no-audit --no-fund
+RUN --mount=type=cache,target=/root/.npm npm ci --prefer-offline --include=dev --include=optional --no-audit --no-fund
 COPY . .
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
@@ -17,7 +17,7 @@ ENV NODE_ENV=production DATA_DIR=/data PORT=8787
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates fonts-liberation2 && rm -rf /var/lib/apt/lists/*
 COPY deploy/runtime/package*.json ./
 COPY deploy/runtime/canvas ./canvas
-RUN npm ci --omit=dev --no-audit --no-fund && mkdir /data && chown node:node /data
+RUN --mount=type=cache,target=/root/.npm npm ci --prefer-offline --omit=dev --no-audit --no-fund && mkdir /data && chown node:node /data
 COPY --from=build /app/dist ./dist
 COPY drizzle ./drizzle
 COPY deploy/runtime/server.mjs ./server.mjs
