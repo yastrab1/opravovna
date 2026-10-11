@@ -1,6 +1,12 @@
 export type ApiContext = {
   req: Request;
-  u: { userId: string; email: string; displayName?: string; imageUrl?: string };
+  u: {
+    userId: string;
+    email: string;
+    displayName?: string;
+    firstName?: string | null;
+    imageUrl?: string;
+  };
   email: string;
   DB: D1Database;
   BUCKET: R2Bucket;

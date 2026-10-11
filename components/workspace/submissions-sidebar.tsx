@@ -1,6 +1,5 @@
 "use client";
-import PointsFilter from "./points-filter";
-import { emptyPointsFilter } from "@/lib/points-filter";
+import SubmissionFilters from "./submission-filters";
 import Thumbnail from "@/app/thumbnail";
 import { categoryLabel } from "@/lib/preferences";
 import { tagName } from "@/lib/tags";
@@ -14,14 +13,8 @@ export default function SubmissionsSidebar({
   setQuery,
   projectPreferences,
   setProjectPreferences,
-  filter,
-  setFilter,
   allTags,
-  tagFilter,
-  setTagFilter,
-  categories,
   categoryOptions,
-  setCategories,
   documents,
   active,
   switchDoc,
@@ -34,14 +27,8 @@ export default function SubmissionsSidebar({
   setQuery: any;
   projectPreferences: any;
   setProjectPreferences: any;
-  filter: string;
-  setFilter: any;
   allTags: string[];
-  tagFilter: string;
-  setTagFilter: any;
-  categories: string[];
   categoryOptions: string[];
-  setCategories: (values: string[]) => void;
   documents: any[];
   active: any;
   switchDoc: any;
@@ -81,69 +68,12 @@ export default function SubmissionsSidebar({
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <div className="filters">
-        <select
-          aria-label="Zoradiť riešenia"
-          value={projectPreferences.sort}
-          onChange={(e) =>
-            setProjectPreferences({ sort: e.target.value as "name" | "graded" })
-          }
-        >
-          <option value="name">Abecedne</option>
-          <option value="graded">Opravené najprv</option>
-        </select>
-        <select
-          aria-label="Filtrovať hodnotenie"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option value="all">Všetky riešenia</option>
-          <option value="ungraded">Bez hodnotenia</option>
-          <option value="graded">Ohodnotené</option>
-        </select>
-        {allTags.length > 0 && (
-          <select
-            aria-label="Filtrovať štítok"
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-          >
-            <option value="">Všetky štítky</option>
-            {allTags.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        )}
-      </div>
-      <PointsFilter
-        value={projectPreferences.points ?? emptyPointsFilter}
-        onChange={(points) => setProjectPreferences({ points })}
+      <SubmissionFilters
+        value={projectPreferences}
+        onChange={setProjectPreferences}
+        tags={allTags}
+        categories={categoryOptions}
       />
-      <details className="categoryfilter">
-        <summary>
-          Kategórie {categories.length ? `(${categories.length})` : "(všetky)"}
-        </summary>
-        <div>
-          {categoryOptions.map((c) => (
-            <label key={c}>
-              <input
-                type="checkbox"
-                checked={categories.includes(c)}
-                onChange={(e) =>
-                  setCategories(
-                    e.target.checked
-                      ? [...categories, c]
-                      : categories.filter((x) => x !== c),
-                  )
-                }
-              />{" "}
-              {categoryLabel(c)}
-            </label>
-          ))}
-          {categories.length > 0 && (
-            <button onClick={() => setCategories([])}>Zobraziť všetky</button>
-          )}
-        </div>
-      </details>
       <div className="documentlist">
         {documents.map((d: any) => (
           <button

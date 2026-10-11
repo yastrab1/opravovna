@@ -1,0 +1,158 @@
+.submission-filters {
+  position: relative;
+  margin: 10px 12px;
+  font-size: 12px;
+  z-index: 4;
+}
+.submission-filters > summary {
+  list-style: none;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  cursor: pointer;
+}
+.submission-filters > summary::-webkit-details-marker {
+  display: none;
+}
+.submission-filters > summary > svg:last-child {
+  margin-left: auto;
+}
+.submission-filters[open] > summary {
+  border-color: var(--accent);
+}
+.filter-count {
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.filter-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 14px;
+  display: grid;
+  gap: 13px;
+  box-shadow: 0 10px 30px oklch(12% 0.01 245 / 0.45);
+  max-height: min(65vh, 620px);
+  overflow: auto;
+}
+.filter-menu label:not(.filter-check),
+.filter-label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.filter-menu select {
+  min-width: 0;
+  width: 100%;
+  font-size: 12px;
+  padding: 7px;
+  color: var(--ink);
+}
+.filter-menu .filter-check {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--ink);
+}
+.filter-check input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+.filter-menu .pointsfilter {
+  padding: 5px 0 0;
+}
+.filter-menu fieldset {
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 0 0;
+  min-width: 0;
+}
+.filter-menu legend {
+  padding-right: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.filter-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+.filter-menu fieldset button {
+  font-size: 11px;
+  margin-top: 10px;
+  padding: 4px 7px;
+}
+.project-tag-option {
+  display: inline-flex;
+  max-width: 100%;
+}
+.project-tag-option > button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.project-tag-option > button:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--muted);
+  padding: 4px;
+}
+.project-tag-option > button:last-child:hover {
+  color: var(--danger);
+}
+.assignment-categories {
+  display: grid;
+  gap: 16px;
+  max-height: 55vh;
+  overflow: auto;
+  margin: 16px 0;
+}
+.assignment-categories fieldset {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.assignment-categories legend {
+  padding: 0 6px;
+  font-size: 13px;
+}
+.assignment-person {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 12px;
+}
+.assignment-person input {
+  accent-color: var(--accent);
+}
+.assignment-person small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+.dialogactions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.sharing > p,
+.sharing form > p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-top: 12px;
+}

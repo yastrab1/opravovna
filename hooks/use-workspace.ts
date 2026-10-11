@@ -1,5 +1,5 @@
 "use client";
-import { matchesPoints, emptyPointsFilter } from "@/lib/points-filter";
+import { navigationDocuments as getNavigationDocuments } from "@/lib/submission-list";
 import { useAccountPreferences } from "@/hooks/use-account-preferences";
 import { useProjectSession } from "@/hooks/use-project-session";
 import { api } from "@/lib/client-api";
@@ -7,10 +7,11 @@ import { exportZipBrowser as runexportZipBrowser } from "@/lib/export/browser-ex
 import { exportZip as runexportZip } from "@/lib/export/server-export";
 import { importZip as runimportZip } from "@/lib/import/import-project";
 import { resolveMerge as runresolveMerge } from "@/lib/import/resolve-conflicts";
-import { categoryLabel, compareCategories } from "@/lib/preferences";
+import { compareCategories } from "@/lib/preferences";
 import { collectTags, tagName } from "@/lib/tags";
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useRef, useState } from "react";
+import { useProjectActions } from "./use-project-actions";
 import { useImportScores } from "./use-import-scores";
 export function useWorkspace() {
   const scoreCorrection = useImportScores();
@@ -55,17 +56,20 @@ export function useWorkspace() {
     preferences,
     persistPreferences,
     projectPreferences,
-    categories,
     setProjectPreferences,
-    setCategories,
   } = useAccountPreferences(user, project?.id, report);
 
-  const { query, filter, tagFilter } = projectPreferences;
+  const { deleteProjectTag, assignCategories } = useProjectActions({
+    current,
+    save,
+    setProject,
+    setBusy,
+    report,
+    projectPreferences,
+    setProjectPreferences,
+  });
+  const { query, filter } = projectPreferences;
   const setQuery = (query: string) => setProjectPreferences({ query });
-  const setFilter = (filter: typeof projectPreferences.filter) =>
-    setProjectPreferences({ filter });
-  const setTagFilter = (tagFilter: string) =>
-    setProjectPreferences({ tagFilter });
 
   useEffect(() => {
     if (mergeOpen) mergeDialog.current?.showModal();
@@ -138,34 +142,10 @@ export function useWorkspace() {
   const hasJoin =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("join");
-  const navigationDocuments =
-    project?.documents
-      .filter(
-        (d: any) =>
-          `${d.metadata.name} ${d.metadata.submissionId} ${d.metadata.rocnik} ${categoryLabel(d.metadata.rocnik)}`
-            .toLowerCase()
-            .includes(query.toLowerCase()) &&
-          matchesPoints(
-            d.state.scoring?.points,
-            projectPreferences.points ?? emptyPointsFilter,
-          ) &&
-          (!categories.length || categories.includes(d.metadata.rocnik)) &&
-          (!tagFilter ||
-            d.state.tags.some(
-              (t: any) => (typeof t === "object" ? t.name : t) === tagFilter,
-            )),
-      )
-      .sort(
-        (a: any, b: any) =>
-          (projectPreferences.sort === "graded"
-            ? Number(b.state.scoring?.points != null) -
-              Number(a.state.scoring?.points != null)
-            : 0) ||
-          a.metadata.name.localeCompare(b.metadata.name, "sk", {
-            numeric: true,
-          }) ||
-          Number(a.metadata.submissionId) - Number(b.metadata.submissionId),
-      ) ?? [];
+  const navigationDocuments = getNavigationDocuments(
+    project,
+    projectPreferences,
+  );
   const documents = navigationDocuments.filter(
     (d: any) =>
       filter === "all" ||
@@ -208,6 +188,8 @@ export function useWorkspace() {
 
   return {
     scoreCorrection,
+    deleteProjectTag,
+    assignCategories,
     isSignedIn,
     preferences,
     persistPreferences,
@@ -255,14 +237,8 @@ export function useWorkspace() {
     setQuery,
     projectPreferences,
     setProjectPreferences,
-    filter,
-    setFilter,
     allTags,
-    tagFilter,
-    setTagFilter,
-    categories,
     categoryOptions,
-    setCategories,
     documents,
     active,
     switchDoc,

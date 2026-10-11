@@ -1,5 +1,11 @@
 "use client";
-import { ChevronLeft, Download, Save, Users } from "lucide-react";
+import {
+  ChevronLeft,
+  Download,
+  Save,
+  Users,
+  UserRoundCheck,
+} from "lucide-react";
 export default function ProjectToolbar({
   save,
   setProject,
@@ -12,6 +18,7 @@ export default function ProjectToolbar({
   exportZip,
   mergeConflicts,
   openSharing,
+  openAssignments,
 }: {
   save: any;
   setProject: any;
@@ -24,6 +31,7 @@ export default function ProjectToolbar({
   exportZip: any;
   mergeConflicts: any[];
   openSharing: any;
+  openAssignments: () => void;
 }) {
   return (
     <div className="projectbar">
@@ -58,6 +66,15 @@ export default function ProjectToolbar({
           <button onClick={openSharing} disabled={!!busy}>
             <Users size={16} />
             <span className="desktop">Zdieľať</span>
+          </button>
+        )}
+        {project.role === "owner" && (
+          <button
+            onClick={openAssignments}
+            disabled={!!busy || !project.documents.length}
+          >
+            <UserRoundCheck size={16} />
+            <span className="desktop">Priradiť</span>
           </button>
         )}
         <button

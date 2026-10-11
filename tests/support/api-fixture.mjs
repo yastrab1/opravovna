@@ -13,15 +13,17 @@ export async function createApiFixture() {
   );
   try {
     await fs.mkdir(".test-tmp/server", { recursive: true });
-    for (const name of ["archive", "merge", "presence"])
+    for (const name of ["archive", "merge", "presence", "tags", "assignments"])
       await fs.writeFile(
         `.test-tmp/${name}.mjs`,
-        ts.transpileModule(await fs.readFile(`lib/${name}.ts`, "utf8"), {
-          compilerOptions: {
-            target: ts.ScriptTarget.ES2022,
-            module: ts.ModuleKind.ESNext,
-          },
-        }).outputText,
+        ts
+          .transpileModule(await fs.readFile(`lib/${name}.ts`, "utf8"), {
+            compilerOptions: {
+              target: ts.ScriptTarget.ES2022,
+              module: ts.ModuleKind.ESNext,
+            },
+          })
+          .outputText.replace(/(from\s+['"]\.[^'"]+)(['"])/g, "$1.mjs$2"),
       );
     for (const name of await fs.readdir("lib/server"))
       if (name.endsWith(".ts"))
@@ -34,7 +36,11 @@ export async function createApiFixture() {
                 module: ts.ModuleKind.ESNext,
               },
             })
-            .outputText.replace(/(from\s+['"]\.[^'"]+)(['"])/g, "$1.mjs$2"),
+            .outputText.replace(
+              'import { clerkClient } from "@clerk/nextjs/server";',
+              "const clerkClient=async()=>globalThis.__testClerkClient;",
+            )
+            .replace(/(from\s+['"]\.[^'"]+)(['"])/g, "$1.mjs$2"),
         );
     const DB = await mf.getD1Database("DB"),
       BUCKET = await mf.getR2Bucket("BUCKET");

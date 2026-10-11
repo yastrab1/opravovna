@@ -27,7 +27,9 @@ export type ToolStyle = {
 };
 export type ProjectPreferences = {
   categories: string[];
-  sort: "name" | "graded";
+  sort: "name" | "category" | "points";
+  gradedFirst: boolean;
+  taggedOnly: boolean;
   points?: PointsFilter;
   query: string;
   filter: "all" | "graded" | "ungraded";
@@ -37,6 +39,8 @@ export function defaultProjectPreferences(): ProjectPreferences {
   return {
     categories: [],
     sort: "name",
+    gradedFirst: false,
+    taggedOnly: false,
     query: "",
     filter: "all",
     tagFilter: "",
@@ -103,7 +107,9 @@ export function readPreferences(raw: any): Preferences {
       categories: Array.isArray(v?.categories)
         ? v.categories.filter((x: any) => typeof x === "string")
         : [],
-      sort: v?.sort === "graded" ? "graded" : "name",
+      sort: ["category", "points"].includes(v?.sort) ? v.sort : "name",
+      gradedFirst: v?.gradedFirst === true || v?.sort === "graded",
+      taggedOnly: v?.taggedOnly === true,
       points: readPointsFilter(v?.points),
       query: typeof v?.query === "string" ? v.query : "",
       filter: ["graded", "ungraded"].includes(v?.filter) ? v.filter : "all",

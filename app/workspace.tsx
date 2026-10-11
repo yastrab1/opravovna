@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useState } from "react";
+import AssignmentDialog from "@/components/workspace/assignment-dialog";
 import GradingSidebar from "@/components/workspace/grading-sidebar";
 import ImportScoreDialog from "@/components/workspace/import-score-dialog";
 import MergeDialog from "@/components/workspace/merge-dialog";
@@ -18,8 +20,11 @@ const PdfEditor = dynamic(() => import("./pdf-editor"), {
   loading: () => <div className="loading">Pripravujem editor…</div>,
 });
 export default function Workspace() {
+  const [assigning, setAssigning] = useState(false);
   const {
     scoreCorrection,
+    deleteProjectTag,
+    assignCategories,
     isSignedIn,
     preferences,
     persistPreferences,
@@ -67,14 +72,8 @@ export default function Workspace() {
     setQuery,
     projectPreferences,
     setProjectPreferences,
-    filter,
-    setFilter,
     allTags,
-    tagFilter,
-    setTagFilter,
-    categories,
     categoryOptions,
-    setCategories,
     documents,
     active,
     switchDoc,
@@ -89,6 +88,7 @@ export default function Workspace() {
     tag,
     setTag,
   } = useWorkspace();
+  useEffect(() => setAssigning(false), [project?.id]);
   return (
     <main>
       {scoreCorrection.issues.length > 0 && (
@@ -192,7 +192,17 @@ export default function Workspace() {
             exportZip={exportZip}
             mergeConflicts={mergeConflicts}
             openSharing={openSharing}
+            openAssignments={() => setAssigning(true)}
           />
+          {assigning && project.role === "owner" && (
+            <AssignmentDialog
+              key={project.id}
+              project={project}
+              categories={categoryOptions}
+              onClose={() => setAssigning(false)}
+              onAssign={assignCategories}
+            />
+          )}
           {sharing && (
             <ShareDialog
               shareDialog={shareDialog}
@@ -219,14 +229,8 @@ export default function Workspace() {
               setQuery={setQuery}
               projectPreferences={projectPreferences}
               setProjectPreferences={setProjectPreferences}
-              filter={filter}
-              setFilter={setFilter}
               allTags={allTags}
-              tagFilter={tagFilter}
-              setTagFilter={setTagFilter}
-              categories={categories}
               categoryOptions={categoryOptions}
-              setCategories={setCategories}
               documents={documents}
               active={active}
               switchDoc={switchDoc}
@@ -254,6 +258,7 @@ export default function Workspace() {
                   openNext={openNext}
                   editor={editor}
                   projectTags={projectTags}
+                  deleteProjectTag={deleteProjectTag}
                   toggleTag={toggleTag}
                   tag={tag}
                   setTag={setTag}

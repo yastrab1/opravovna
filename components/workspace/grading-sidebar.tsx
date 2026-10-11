@@ -1,7 +1,7 @@
 "use client";
 import { categoryLabel } from "@/lib/preferences";
-import { tagName } from "@/lib/tags";
-import { Check, ChevronRight, Plus, ShieldCheck, Tag, X } from "lucide-react";
+import ProjectTags from "./project-tags";
+import { Check, ChevronRight, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 export default function GradingSidebar({
   doc,
@@ -16,6 +16,7 @@ export default function GradingSidebar({
   changed,
   nextDocument,
   openNext,
+  deleteProjectTag,
 }: {
   doc: any;
   readonly: boolean;
@@ -29,6 +30,7 @@ export default function GradingSidebar({
   changed: any;
   nextDocument: any;
   openNext: () => Promise<void>;
+  deleteProjectTag: any;
 }) {
   return (
     <aside className="grading">
@@ -86,94 +88,19 @@ export default function GradingSidebar({
           </>
         )}
       </div>
-      <div className="gradesection">
-        <h3>
-          <Tag size={15} /> Štítky
-        </h3>
-        <div className="tags">
-          {doc.state.tags.map((t: any, i: number) => (
-            <span key={i}>
-              {typeof t === "object" ? t.name : t}
-              {!readonly && (
-                <button
-                  aria-label="Odobrať štítok"
-                  onClick={() =>
-                    changed({
-                      ...doc.state,
-                      tags: doc.state.tags.filter(
-                        (_: any, j: number) => i !== j,
-                      ),
-                    })
-                  }
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </span>
-          ))}
-        </div>
-        {!readonly && (
-          <>
-            {projectTags.length > 0 && (
-              <div className="projecttagpicker">
-                <span className="muted">Štítky projektu</span>
-                <div className="tagchoices">
-                  {projectTags.map((t) => (
-                    <button
-                      type="button"
-                      key={tagName(t)}
-                      aria-pressed={doc.state.tags.some(
-                        (v: any) => tagName(v) === tagName(t),
-                      )}
-                      onClick={() => toggleTag(t)}
-                      disabled={!!busy}
-                    >
-                      {doc.state.tags.some(
-                        (v: any) => tagName(v) === tagName(t),
-                      ) ? (
-                        <Check size={12} />
-                      ) : (
-                        <Plus size={12} />
-                      )}{" "}
-                      {tagName(t)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <form
-              className="tagform"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const name = tag.trim();
-                if (
-                  name &&
-                  !doc.state.tags.some((t: any) => tagName(t) === name)
-                )
-                  toggleTag(
-                    projectTags.find((t) => tagName(t) === name) ?? name,
-                  );
-                setTag("");
-              }}
-            >
-              <input
-                aria-label="Nový štítok projektu"
-                placeholder="Nový štítok projektu…"
-                value={tag}
-                maxLength={60}
-                onChange={(e) => setTag(e.target.value)}
-                disabled={!!busy}
-              />
-              <button
-                aria-label="Vytvoriť a priradiť štítok"
-                disabled={!!busy || !tag.trim()}
-              >
-                <Plus size={16} />
-              </button>
-            </form>
-          </>
-        )}
-      </div>
+      <ProjectTags
+        {...{
+          doc,
+          readonly,
+          busy,
+          projectTags,
+          toggleTag,
+          tag,
+          setTag,
+          changed,
+          deleteProjectTag,
+        }}
+      />
       <div className="gradingfoot">
         <ShieldCheck size={17} />
         <p>

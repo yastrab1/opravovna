@@ -1,3 +1,5 @@
+import { handleAssignments } from "@/lib/server/assignments";
+import { handleProjectTags } from "@/lib/server/project-tags";
 import { handlePresence } from "@/lib/server/presence";
 import { handleDocuments } from "@/lib/server/documents";
 import { handleExports } from "@/lib/server/exports";
@@ -110,6 +112,8 @@ async function handle(req: Request) {
     };
     for (const handler of [
       handlePresence,
+      handleProjectTags,
+      handleAssignments,
       handleExports,
       handleSharing,
       handleUploads,

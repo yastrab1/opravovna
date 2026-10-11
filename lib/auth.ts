@@ -13,6 +13,7 @@ export async function getUser() {
   return {
     userId: session.userId,
     email: email.emailAddress,
+    firstName: user.firstName?.trim().split(/\s+/)[0] || null,
     displayName: user.fullName || user.username || email.emailAddress,
     imageUrl: user.imageUrl,
   };

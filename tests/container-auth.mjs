@@ -63,3 +63,27 @@ console.log(
     ? "Test project created in isolated container"
     : "Authenticated project request reached validation",
 );
+if (process.env.TEST_ASSIGNMENTS === "1") {
+  const headers = { Cookie: cookie };
+  const list = await fetch(new URL("/api/projects", base), { headers });
+  assert.equal(list.status, 200);
+  const project = (await list.json()).find((p) => p.owner === identity);
+  if (project) {
+    const roster = await fetch(
+      new URL(`/api/projects/${project.id}/assignments`, base),
+      { headers },
+    );
+    assert.equal(roster.status, 200, "Live Clerk collaborator lookup");
+    const people = await roster.json();
+    assert(
+      people.length > 0 &&
+        people.every(
+          (p) =>
+            typeof p.email === "string" &&
+            typeof p.name === "string" &&
+            (p.firstName === null || typeof p.firstName === "string"),
+        ),
+    );
+    console.log("Live collaborator lookup: 200");
+  }
+}

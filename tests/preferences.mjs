@@ -29,7 +29,9 @@ try {
   };
   const filters = {
     categories: ["c5", "k"],
-    sort: "graded",
+    sort: "category",
+    gradedFirst: true,
+    taggedOnly: false,
     points: { comparison: "gt", value: "4,67" },
     query: "Novák",
     filter: "ungraded",
@@ -74,6 +76,10 @@ try {
   assert.equal(invalid.query, "");
   assert.equal(invalid.tagFilter, "");
   assert.equal(invalid.filter, "all");
+  const migrated = readPreferences({ projects: { old: { sort: "graded" } } })
+    .projects.old;
+  assert.equal(migrated.sort, "name");
+  assert.equal(migrated.gradedFirst, true);
   const blockedStorage = {
     getItem() {
       throw new Error("disabled");

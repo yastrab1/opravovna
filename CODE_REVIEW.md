@@ -1,4 +1,4 @@
-# Code review — 2026-10-10
+# Code review — 2026-10-11
 
 ## Resolved findings
 
@@ -10,6 +10,8 @@
 | Import interruptions | Safe read/upload-chunk requests have bounded retries. Already stored PDFs are not uploaded again. Lost archive-completion responses are confirmed against server state before continuing. A failed solution names the file and preserves earlier successful work for re-import. |
 | Text comments | New comments use bounded text boxes and wrap at the right margin, including oversized unbroken tokens. Formatting handles imported character overrides and selected ranges. Text boxes can move between pages with zoom-aware coordinates, edge scrolling and undo/redo; appended pages activate immediately. |
 | Scan rotation | Cropping a rendered page also captured PDF headers and surrounding decoration. The renderer now decodes the embedded raster itself, reserves header space, centers it and fits it to the available area. Preview/export use the same layout and clockwise orientation. Unsupported pages are rejected before recording a rotation. |
+| Review organization | Sorting/filtering is extracted into a pure selector, including independent graded-first ordering and any-tag matching. Tag deletion checks current usage before confirmation and atomically removes catalog, legacy and document references. Category assignment balances only ungraded work and protects all affected revisions and the catalog in one transaction. |
+| Deployment | `just deploy` runs release checks and publishes a pinned image, backs up compose/SQLite, updates only the app and rolls back failed startup/health checks. Isolated executable shims exercise successful deployment, rollback and rejection of dirty checkouts. |
 | Solution permalinks | Persistent project and solution IDs are encoded in the address bar. Initial loading waits for authentication, validates the requested document, and keeps ordinary project authorization. Back/Forward saves before switching, rolls back failed navigation and serializes rapid history requests. |
 | Canvas lifecycle | Fabric wrapped a React-owned canvas, creating competing DOM ownership during page changes. React now owns an empty host and Fabric owns the inserted canvas. Disposal completes before the next canvas initializes. Inactive pages render annotation previews. |
 | Saving and synchronization | Edits arriving during an in-flight save could be left behind when switching documents. The save queue drains pending changes and updates revisions immediately. Stale polling responses are ignored after changing projects. |
