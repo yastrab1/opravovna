@@ -1,4 +1,5 @@
 "use client";
+import { bindPageDrag } from "@/lib/editor/page-transfer";
 import { constrainComment } from "@/lib/editor/page-comment";
 import { bindDrawingTools, configureTool } from "@/lib/editor/drawing-tools";
 import { loadObjects } from "@/lib/pdf-engine";
@@ -18,6 +19,7 @@ export function useAnnotationCanvas({
   readonly,
   canvas,
   capture,
+  transferText,
   blocked,
   mode,
   setTool,
@@ -41,6 +43,7 @@ export function useAnnotationCanvas({
   readonly: any;
   canvas: any;
   capture: any;
+  transferText: (object: any) => boolean;
   blocked: any;
   mode: any;
   setTool: any;
@@ -55,6 +58,7 @@ export function useAnnotationCanvas({
     if (!ready) return;
     let canceled = false;
     let own: any;
+    let stopDrag: (() => void) | undefined;
     let element: HTMLCanvasElement | undefined;
     currentPage.current = page;
     loading.current = true;
@@ -99,7 +103,10 @@ export function useAnnotationCanvas({
         if (target) constrainComment(target, viewport.width);
         capture();
       };
-      own.on("object:modified", captureText);
+      own.on("object:modified", (event: any) => {
+        if (!transferText(event.target)) captureText(event);
+      });
+      stopDrag = bindPageDrag(own, stage.current);
       own.on("path:created", ({ path }: any) => {
         path.name = "Path_" + crypto.randomUUID().slice(0, 9);
         capture();
@@ -115,6 +122,7 @@ export function useAnnotationCanvas({
     });
     return () => {
       canceled = true;
+      stopDrag?.();
       loading.current = true;
       if (canvas.current === own) canvas.current = null;
       disposal.current = initialized

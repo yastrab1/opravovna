@@ -117,3 +117,40 @@
     max-width: 160px;
   }
 }
+@media (max-width: 620px) {
+  .appheader {
+    padding: 0 10px;
+  }
+  .appheader .brand {
+    gap: 6px;
+  }
+  .project-presence {
+    gap: 0;
+  }
+  .project-presence > * + * {
+    margin-left: -6px;
+  }
+  .presence-person:hover,
+  .presence-person:focus {
+    z-index: 1;
+  }
+}
+@media (max-width: 360px) {
+  .appheader .beta {
+    display: none;
+  }
+  .headerend {
+    gap: 4px;
+  }
+  .project-presence .presence-person {
+    width: 20px;
+    height: 20px;
+  }
+  .project-presence .presence-person img {
+    width: 18px;
+    height: 18px;
+  }
+  .presence-tooltip {
+    max-width: 135px;
+  }
+}

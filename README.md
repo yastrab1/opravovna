@@ -6,7 +6,7 @@ A Slovak workspace for teams reviewing competition solutions in PDF. Sign in wit
 
 - Projects with owner, editor and viewer permissions; email-based sharing and revocable join links.
 - ZIP imports with three concurrent PDF uploads, bounded retries for transient chunk/read failures and no redundant upload for existing solutions. Original archives and PDFs remain on the server.
-- Text comments wrap at the page edge. Freehand drawing, highlighting, images, arrows and shapes; configurable tool defaults saved to the account.
+- Text comments wrap at the page edge. Format existing text boxes or selected text, and drag boxes between pages with edge scrolling and undo/redo. Added pages become editable immediately. Freehand drawing, highlighting, images, arrows and shapes; configurable tool defaults saved to the account.
 - Continuous page scrolling, appended blank pages and rotation of an embedded scan while preserving the PDF header.
 - Non-negative decimal grades with no upper limit. Invalid imported grades open a correction dialog before upload; cancel stops the import.
 - Live project viewers beside Settings, with profile photos and names on hover or keyboard focus. Click a reviewer to open their latest focused solution, saving your own edits first. Multiple tabs count once; abandoned sessions expire automatically.

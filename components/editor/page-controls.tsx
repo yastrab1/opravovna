@@ -16,6 +16,7 @@ export default function PageControls({
   page,
   count,
   scrollToPage,
+  setPage,
   zoom,
   setZoom,
   readonly,
@@ -32,6 +33,7 @@ export default function PageControls({
   page: any;
   count: any;
   scrollToPage: any;
+  setPage: (page: number) => void;
   zoom: any;
   setZoom: any;
   readonly: any;
@@ -126,6 +128,7 @@ export default function PageControls({
             const sizes = [...pageSizes, { width: 595.28, height: 841.89 }];
             setPageSizes(sizes);
             setCount(sizes.length);
+            setPage(sizes.length - 1);
             setTimeout(() => scrollToPage(sizes.length - 1), 0);
           }}
         >

@@ -23,7 +23,6 @@ export default function EditorToolbar({
   color,
   setColor,
   canvas,
-  capture,
   font,
   setFont,
   style,
@@ -46,7 +45,6 @@ export default function EditorToolbar({
   color: any;
   setColor: any;
   canvas: any;
-  capture: any;
   font: any;
   setFont: any;
   style: any;
@@ -110,16 +108,7 @@ export default function EditorToolbar({
           disabled={readonly}
           onChange={(e) => {
             setColor(e.target.value);
-            const c = canvas.current;
-            c?.getActiveObjects().forEach((o: any) =>
-              o.set(
-                o.type.toLowerCase().includes("text")
-                  ? { fill: e.target.value }
-                  : { stroke: e.target.value },
-              ),
-            );
-            c?.renderAll();
-            if (c?.getActiveObjects().length) capture();
+            style("color", e.target.value);
           }}
         />
         <select

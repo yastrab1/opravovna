@@ -5,7 +5,9 @@ import PageStack from "@/components/editor/page-stack";
 import { useAnnotationCanvas } from "@/hooks/editor/use-annotation-canvas";
 import { useEditHistory } from "@/hooks/editor/use-edit-history";
 import { usePdfPages } from "@/hooks/editor/use-pdf-pages";
-import { constrainComment } from "@/lib/editor/page-comment";
+import { fabricToLegacy } from "@/lib/pdf-annotations";
+import { textDropPage } from "@/lib/editor/page-transfer";
+import { styleAnnotation } from "@/lib/editor/annotation-style";
 import { insertImage } from "@/lib/editor/insert-image";
 
 import { type Preferences, type ToolKey } from "@/lib/preferences";
@@ -127,6 +129,7 @@ export default function PdfEditor({
     readonly,
     canvas,
     capture,
+    transferText,
     blocked,
     mode,
     setTool,
@@ -174,11 +177,30 @@ export default function PdfEditor({
     const c = canvas.current;
     if (!c || readonly) return;
     c.getActiveObjects().forEach((o: any) => {
-      o.set({ [key]: value });
-      constrainComment(o, size.width);
+      styleAnnotation(o, key, value, size.width);
     });
     c.renderAll();
     capture();
+  }
+  function transferText(object: any) {
+    const destination = textDropPage(
+      object,
+      currentPage.current,
+      pageBounds.current,
+      pageSizes,
+    );
+    if (destination === null) return false;
+    emit({
+      ...state.current,
+      changes: [
+        ...state.current.changes.filter(
+          (change: any) => change.data?.name !== object.name,
+        ),
+        fabricToLegacy(object, destination),
+      ],
+    });
+    setPage(destination);
+    return true;
   }
   async function image(file: File) {
     await insertImage(file, { canvas, size, capture, onError });
@@ -190,7 +212,7 @@ export default function PdfEditor({
     });
   }
   function updateCurrentPage() {
-    if (!stage.current) return;
+    if (!stage.current || canvas.current?.getActiveObject()?.isMoving) return;
     const center =
       stage.current.getBoundingClientRect().top +
       stage.current.clientHeight / 2;
@@ -221,7 +243,6 @@ export default function PdfEditor({
         color={color}
         setColor={setColor}
         canvas={canvas}
-        capture={capture}
         font={font}
         setFont={setFont}
         style={style}
@@ -243,6 +264,7 @@ export default function PdfEditor({
         page={page}
         count={count}
         scrollToPage={scrollToPage}
+        setPage={setPage}
         zoom={zoom}
         setZoom={setZoom}
         readonly={readonly}
