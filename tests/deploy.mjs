@@ -25,7 +25,7 @@ const digest = "sha256:" + "2".repeat(64),
 const shim = `#!/usr/bin/env node
 import fs from 'node:fs';import cp from 'node:child_process';import path from 'node:path';const command=path.basename(process.argv[1]),args=process.argv.slice(2);fs.appendFileSync(process.env.DEPLOY_TEST_LOG,JSON.stringify({command,args})+'\\n');
 if(command==='git'){if(args[0]==='rev-parse')console.log('abc123abc123');else if(process.env.DEPLOY_TEST_DIRTY)console.log(' M changed.ts')}
-if(command==='docker'){if(args[0]==='push')console.log('digest: ${digest}');if(args[0]==='compose'&&process.env.DEPLOY_TEST_FAIL&&!fs.existsSync(process.env.DEPLOY_TEST_FAIL)){fs.writeFileSync(process.env.DEPLOY_TEST_FAIL,'failed once');process.exit(1)}}
+if(command==='docker'){if(args[0]==='buildx'&&args[1]==='build')fs.writeFileSync(args[args.indexOf('--metadata-file')+1],JSON.stringify({'containerimage.digest':'${digest}'}));if(args[0]==='compose'&&process.env.DEPLOY_TEST_FAIL&&!fs.existsSync(process.env.DEPLOY_TEST_FAIL)){fs.writeFileSync(process.env.DEPLOY_TEST_FAIL,'failed once');process.exit(1)}}
 if(command==='ssh'&&args.includes('python3')){let source=fs.readFileSync(0,'utf8');source=source.replaceAll('http://127.0.0.1:8791/healthz',process.env.DEPLOY_ORIGIN+'/healthz').replace('range(30)','range(2)').replace('time.sleep(1)','time.sleep(.01)');const result=cp.spawnSync('python3',['-'],{input:source,stdio:['pipe','inherit','inherit'],env:process.env});process.exit(result.status)}
 `;
 for (const name of ["npm", "git", "docker", "ssh"])
@@ -84,6 +84,25 @@ const run = async (mode) => {
     assert.equal(status, 0, output);
     assert(compose.includes(digest));
     assert.equal(commands.filter((c) => c.command === "npm").length, 6);
+    const build = commands.find(
+      (c) =>
+        c.command === "docker" &&
+        c.args[0] === "buildx" &&
+        c.args[1] === "build",
+    );
+    assert(build.args.includes("--push"));
+    assert.equal(
+      build.args[build.args.indexOf("--builder") + 1],
+      "opravovna-r2d2",
+    );
+    assert.equal(
+      build.args[build.args.indexOf("--platform") + 1],
+      "linux/amd64",
+    );
+    assert(
+      !commands.some((c) => c.command === "docker" && c.args[0] === "push"),
+      "SSH builder pushes directly without transferring image locally",
+    );
     assert.equal((await readdir(stack + "/backups/opravovna")).length, 1);
     assert(
       (await readdir(stack + "/backups/opravovna", { recursive: true })).some(

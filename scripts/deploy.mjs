@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
 const run = (command, args, capture = false) => {
   const result = spawnSync(command, args, {
     stdio: capture ? ["inherit", "pipe", "pipe"] : "inherit",
@@ -54,10 +55,20 @@ if (
   throw new Error("Invalid deployment host, stack or image.");
 const tag = `${image}:${revision}`;
 console.log(`Building ${tag}`);
-run("node", ["scripts/build-container.mjs", tag]);
-const pushed = run("docker", ["push", tag], true);
-const digest = pushed.match(/digest: (sha256:[a-f0-9]{64})/)?.[1];
-if (!digest) throw new Error("Registry did not return an image digest.");
+const temporary = mkdtempSync(join(tmpdir(), "opravovna-release-"));
+let digest;
+try {
+  process.env.CONTAINER_METADATA_FILE = join(temporary, "metadata.json");
+  run("node", ["scripts/build-container.mjs", tag]);
+  digest = JSON.parse(
+    readFileSync(process.env.CONTAINER_METADATA_FILE, "utf8"),
+  )["containerimage.digest"];
+  if (!/^sha256:[a-f0-9]{64}$/.test(digest))
+    throw new Error("Registry did not return an image digest.");
+} finally {
+  delete process.env.CONTAINER_METADATA_FILE;
+  rmSync(temporary, { recursive: true, force: true });
+}
 const pinned = `${image}@${digest}`;
 run("ssh", ["-o", "BatchMode=yes", host, "docker", "pull", pinned]);
 const remote = `
