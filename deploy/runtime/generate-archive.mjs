@@ -1,16 +1,10 @@
 import fs from "node:fs/promises";
-import { createWriteStream } from "node:fs";
-import { pipeline } from "node:stream/promises";
 import JSZip from "jszip";
-import {
-  gradedDocuments,
-  hasPdfEdits,
-  writePoints,
-  addGradedPdf,
-} from "./dist/export/archive-export.mjs";
+import { gradedDocuments, hasPdfEdits } from "./dist/export/archive-export.mjs";
+import { archiveParts } from "./dist/export/archive-parts.mjs";
 export async function generateArchive(
   job,
-  { initialized, getBucket, threads, pool, isClosing, directory },
+  { initialized, getBucket, threads, pool, isClosing, directory, partBytes },
 ) {
   const start = performance.now();
   await initialized;
@@ -25,7 +19,7 @@ export async function generateArchive(
   const sourceZip = await JSZip.loadAsync(
     await new Response(original.body).arrayBuffer(),
   );
-  const zip = new JSZip();
+  const entries = [];
   const exportDocuments = gradedDocuments(snapshot.documents);
   let index = 0,
     failure;
@@ -44,7 +38,7 @@ export async function generateArchive(
           const { state } = document;
           const changed = hasPdfEdits(state);
           const output = changed ? await pool.run(bytes.slice(), state) : bytes;
-          addGradedPdf(zip, document, output);
+          entries.push({ document, bytes: output });
           job.completed++;
         } catch (error) {
           if (!failure) {
@@ -63,23 +57,31 @@ export async function generateArchive(
   if (failure) throw failure;
   if (isClosing())
     throw new Error("Server sa reštartuje. Skúste export znova.");
-  await writePoints(
-    zip,
-    sourceZip,
-    snapshot.documents,
-    snapshot.project.legacy,
-  );
   job.stage = "packing";
   await fs.mkdir(directory, { recursive: true });
-  await pipeline(
-    zip.generateNodeStream(
-      { type: "nodebuffer", streamFiles: true, compression: "STORE" },
-      (update) => {
-        job.percent = Math.round(update.percent);
-      },
-    ),
-    createWriteStream(job.file, { mode: 0o600 }),
-  );
+  entries.sort((a, b) => a.document.path.localeCompare(b.document.path));
+  job.parts = [];
+  for await (const part of archiveParts(
+    entries,
+    sourceZip,
+    snapshot.project.legacy,
+    partBytes,
+  )) {
+    const number = job.parts.length + 1;
+    const file = job.file.replace(/\.zip$/, `-part-${number}.zip`);
+    job.files.push(file);
+    await fs.writeFile(file, part.bytes, { mode: 0o600 });
+    job.parts.push({
+      part: number,
+      bytes: part.bytes.byteLength,
+      count: part.count,
+    });
+    job.percent = Math.round(
+      (job.parts.reduce((sum, p) => sum + p.count, 0) /
+        Math.max(1, job.total)) *
+        100,
+    );
+  }
   job.status = "ready";
   job.stage = "ready";
   job.finished = Date.now();

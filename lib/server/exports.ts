@@ -61,7 +61,8 @@ export async function handleExports({
         new Request(
           "http://export.internal/jobs/" +
             encodeURIComponent(p[3]) +
-            (p[4] ? "/download" : ""),
+            (p[4] ? "/download" : "") +
+            new URL(req.url).search,
           { headers },
         ),
       );

@@ -1,4 +1,5 @@
 "use client";
+import ExportDownloadList from "@/components/workspace/export-downloads";
 import ErrorSolutionLink from "@/components/workspace/error-solution-link";
 import { useEffect, useState } from "react";
 import AssignmentDialog from "@/components/workspace/assignment-dialog";
@@ -23,6 +24,8 @@ const PdfEditor = dynamic(() => import("./pdf-editor"), {
 export default function Workspace() {
   const [assigning, setAssigning] = useState(false);
   const {
+    downloads,
+    publishDownloads,
     scoreCorrection,
     deleteProjectTag,
     assignCategories,
@@ -183,6 +186,14 @@ export default function Workspace() {
         />
       ) : (
         <>
+          {downloads &&
+            downloads.project === project.id &&
+            downloads.parts.length > 1 && (
+              <ExportDownloadList
+                downloads={downloads}
+                close={() => publishDownloads(null)}
+              />
+            )}
           <ProjectToolbar
             save={save}
             setProject={setProject}

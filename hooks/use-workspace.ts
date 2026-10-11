@@ -1,4 +1,5 @@
 "use client";
+import { useExportDownloads } from "./use-export-downloads";
 import { navigationDocuments as getNavigationDocuments } from "@/lib/submission-list";
 import { useAccountPreferences } from "@/hooks/use-account-preferences";
 import { useProjectSession } from "@/hooks/use-project-session";
@@ -15,6 +16,7 @@ import { useProjectActions } from "./use-project-actions";
 import { useImportScores } from "./use-import-scores";
 export function useWorkspace() {
   const scoreCorrection = useImportScores();
+  const { downloads, publishDownloads } = useExportDownloads();
   const { isLoaded, isSignedIn, user } = useUser();
   const [sharing, setSharing] = useState(false),
     [members, setMembers] = useState<any[]>([]),
@@ -121,10 +123,17 @@ export function useWorkspace() {
       setBusy,
       report,
       exportZipBrowser,
+      publishDownloads,
     });
   }
   async function exportZipBrowser() {
-    return runexportZipBrowser({ project, setError, setBusy, report });
+    return runexportZipBrowser({
+      project,
+      setError,
+      setBusy,
+      report,
+      publishDownloads,
+    });
   }
   async function openSharing() {
     setSharing(!sharing);
@@ -188,6 +197,8 @@ export function useWorkspace() {
   }
 
   return {
+    downloads,
+    publishDownloads,
     scoreCorrection,
     deleteProjectTag,
     assignCategories,

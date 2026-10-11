@@ -52,6 +52,8 @@ Import understands Arnold MessagePack `changes.arn`, its tag-ID catalog, `points
 
 Final exports contain only graded PDFs at the ZIP root, with each **original PDF basename preserved**, and Arnold's literal **`/points.json` entry**. The leading slash on this metadata entry matches the supplied Arnold export; it does not create a wrapper folder. Ungraded solutions are omitted. Points metadata preserves scoring criteria and uses submission IDs to match PDFs. A namespaced `opravovna` field inside `points.json` preserves project tag names, colors and solution assignments for re-import. Arnold grading fields remain unchanged. Editable annotation sidecars are not included in this final interchange ZIP: annotations are flattened into the PDFs.
 
+Large exports are automatically split into ZIPs of at most 80 MB, including metadata, to keep PMAT uploads manageable. Download each part from the list and upload all of them. Each solution and its score appear in exactly one part, with the original archive filename retained. Server download links are private and expire after 30 minutes. Small exports still download as one ZIP. A single solution exceeding the limit produces an error linking to that solution instead of an incomplete export.
+
 PDF.js decoder assets (WASM, fallback JavaScript, CMaps and fonts) are copied from the installed version into a versioned public directory during the build. Browser viewers and server export workers use matching assets.
 
 The ZIP filename derives from the original problem folder. For example: `4. Kto druhemu jamu kope sam do nej spadne_opravene.zip`.

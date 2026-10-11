@@ -27,7 +27,7 @@ export function createExporter(getBucket, options = {}) {
     await fs.mkdir(directory, { recursive: true });
     // Jobs are in memory; files from a previous process cannot be resumed.
     for (const file of await fs.readdir(directory))
-      if (/^[0-9a-f-]+\.zip$/.test(file))
+      if (/^[0-9a-f-]+(?:-part-\d+)?\.zip$/.test(file))
         await fs.rm(path.join(directory, file), { force: true });
   })();
   let active = false,
@@ -44,10 +44,11 @@ export function createExporter(getBucket, options = {}) {
     failedSolution: job.failedSolution,
     filename: job.filename,
     threads,
+    parts: job.status === "ready" ? job.parts : undefined,
   });
   async function remove(job) {
     jobs.delete(job.id);
-    await fs.rm(job.file, { force: true });
+    await Promise.all(job.files.map((file) => fs.rm(file, { force: true })));
   }
   async function cleanup() {
     for (const job of jobs.values())
@@ -74,14 +75,18 @@ export function createExporter(getBucket, options = {}) {
             pool,
             isClosing: () => closing,
             directory,
+            partBytes: options.partBytes,
           });
         } catch (error) {
           console.error("Archive export failed:", error.message);
           job.status = "error";
           job.error = error.message;
+          job.failedSolution ||= error.failedSolution;
           job.finished = Date.now();
           job.snapshot = null;
-          await fs.rm(job.file, { force: true });
+          await Promise.all(
+            job.files.map((file) => fs.rm(file, { force: true })),
+          );
         }
       }
     } finally {
@@ -141,6 +146,7 @@ export function createExporter(getBucket, options = {}) {
           total: gradedDocuments(snapshot.documents).length,
           percent: 0,
           file: path.join(directory, id + ".zip"),
+          files: [],
           filename: exportName(title),
         };
         jobs.set(id, job);
@@ -166,8 +172,24 @@ export function createExporter(getBucket, options = {}) {
           { error: "Export ešte nie je pripravený." },
           { status: 409 },
         );
-      const stat = await fs.stat(job.file);
-      return new Response(Readable.toWeb(createReadStream(job.file)), {
+      const selected = url.searchParams.get("part");
+      if (selected === null && job.parts.length > 1)
+        return Response.json(
+          { error: "Vyberte časť exportu na stiahnutie." },
+          { status: 409 },
+        );
+      const number = selected === null ? 1 : Number(selected);
+      if (
+        !/^[1-9]\d*$/.test(selected ?? "1") ||
+        !job.parts.some((p) => p.part === number)
+      )
+        return Response.json(
+          { error: "Časť exportu sa nenašla." },
+          { status: 404 },
+        );
+      const file = job.files[number - 1];
+      const stat = await fs.stat(file);
+      return new Response(Readable.toWeb(createReadStream(file)), {
         headers: {
           "Content-Type": "application/zip",
           "Content-Length": String(stat.size),

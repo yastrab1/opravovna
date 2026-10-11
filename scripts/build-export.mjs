@@ -12,6 +12,7 @@ for (const file of [
   "pdf-render",
   "archive",
   "archive-export",
+  "archive-parts",
   "archive-tags",
   "tags",
 ]) {

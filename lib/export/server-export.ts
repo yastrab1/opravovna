@@ -6,6 +6,7 @@ export async function exportZip({
   setBusy,
   report,
   exportZipBrowser,
+  publishDownloads,
 }: {
   project: any;
   save: any;
@@ -13,6 +14,7 @@ export async function exportZip({
   setBusy: any;
   report: any;
   exportZipBrowser: any;
+  publishDownloads: any;
 }) {
   if (!(await save())) return;
   setError("");
@@ -59,6 +61,19 @@ export async function exportZip({
         setBusy("Obnovujem spojenie so serverom…");
       }
     }
+    if (job.parts?.length > 1) {
+      publishDownloads({
+        project: project.id,
+        filename: job.filename,
+        expires: true,
+        parts: job.parts.map((part: any) => ({
+          ...part,
+          url: `/api/${root}/${job.id}/download?part=${part.part}`,
+        })),
+      });
+      return;
+    }
+    publishDownloads(null);
     setBusy("Sťahujem hotový ZIP…");
     const response = await fetch("/api/" + root + "/" + job.id + "/download");
     if (!response.ok) {

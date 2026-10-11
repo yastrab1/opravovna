@@ -41,6 +41,7 @@ try {
     report: (error) => {
       reported = error;
     },
+    publishDownloads: () => assert.fail("Failed exports have no downloads"),
     exportZipBrowser: () => assert.fail("No browser fallback for a PDF error"),
   };
   await exportZip(options);
@@ -56,6 +57,36 @@ try {
     requests,
     1,
     "A save conflict must stop export before any request",
+  );
+  let downloads;
+  globalThis.fetch = async () => {
+    requests++;
+    return Response.json({
+      id: "parts-job",
+      status: "ready",
+      filename: "original_opravene.zip",
+      parts: [
+        { part: 1, bytes: 70_000_000, count: 12 },
+        { part: 2, bytes: 20_000_000, count: 4 },
+      ],
+    });
+  };
+  await exportZip({
+    ...options,
+    publishDownloads: (value) => {
+      downloads = value;
+    },
+  });
+  assert.equal(
+    requests,
+    2,
+    "Multipart export must not trigger automatic bulk downloads",
+  );
+  assert.equal(downloads.project, "project-4");
+  assert.equal(downloads.filename, "original_opravene.zip");
+  assert.equal(
+    downloads.parts[1].url,
+    "/api/projects/project-4/export/parts-job/download?part=2",
   );
   console.log(
     "PASS: export errors retain failing solution permalink identity; save conflicts block export",

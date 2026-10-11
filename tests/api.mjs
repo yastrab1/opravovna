@@ -130,9 +130,10 @@ try {
   assert.equal(exportSnapshot.documents[0].metadata.submissionId, "41803");
   assert.ok(exportSnapshot.documents[0].original);
   assert.equal(
-    (await req(owner, base + "/export/export-job/download")).status,
+    (await req(owner, base + "/export/export-job/download?part=2")).status,
     200,
   );
+  assert.equal(new URL(exportRequest.url).searchParams.get("part"), "2");
   assert.equal(
     new URL(exportRequest.url).pathname,
     "/jobs/export-job/download",

@@ -1,21 +1,19 @@
+import { archiveParts, type ExportEntry } from "../archive-parts";
 import { exportName, projectTitle } from "../archive";
-import {
-  addGradedPdf,
-  gradedDocuments,
-  hasPdfEdits,
-  writePoints,
-} from "../archive-export";
+import { gradedDocuments, hasPdfEdits } from "../archive-export";
 import { api, download } from "../client-api";
 export async function exportZipBrowser({
   project,
   setError,
   setBusy,
   report,
+  publishDownloads,
 }: {
   project: any;
   setError: any;
   setBusy: any;
   report: any;
+  publishDownloads: any;
 }) {
   setError("");
   try {
@@ -26,7 +24,7 @@ export async function exportZipBrowser({
     const res = await fetch("/api/projects/" + pid + "/archive");
     if (!res.ok) throw new Error("Najprv importujte ZIP archív.");
     const sourceZip = await JSZip.loadAsync(await res.arrayBuffer());
-    const zip = new JSZip();
+    const entries: ExportEntry[] = [];
     const { flattenPdf } = await import("@/lib/pdf-engine");
     await document.fonts.ready;
     const exportDocs = gradedDocuments(fresh.documents);
@@ -43,7 +41,7 @@ export async function exportZipBrowser({
         const out = changed
           ? await flattenPdf(originalBytes, d.state)
           : originalBytes;
-        addGradedPdf(zip, d, out);
+        entries.push({ document: d, bytes: out });
       } catch (error) {
         throw Object.assign(
           error instanceof Error ? error : new Error(String(error)),
@@ -58,12 +56,32 @@ export async function exportZipBrowser({
         );
       }
     }
-    await writePoints(zip, sourceZip, fresh.documents, fresh.legacy);
     setBusy("Balím archív…");
-    download(
-      await zip.generateAsync({ type: "blob", compression: "STORE" }),
-      exportName(fresh.folder ? projectTitle(fresh.folder) : fresh.title),
+    const parts = [];
+    try {
+      for await (const part of archiveParts(entries, sourceZip, fresh.legacy)) {
+        parts.push({
+          part: parts.length + 1,
+          count: part.count,
+          bytes: part.bytes.byteLength,
+          url: URL.createObjectURL(
+            new Blob([new Uint8Array(part.bytes)], { type: "application/zip" }),
+          ),
+        });
+      }
+    } catch (error: any) {
+      for (const part of parts) URL.revokeObjectURL(part.url);
+      if (error.failedSolution) error.failedSolution.project = pid;
+      throw error;
+    }
+    const filename = exportName(
+      fresh.folder ? projectTitle(fresh.folder) : fresh.title,
     );
+    publishDownloads({ project: pid, filename, expires: false, parts });
+    if (parts.length === 1) {
+      download(await (await fetch(parts[0].url)).blob(), filename);
+      publishDownloads(null);
+    }
   } catch (e) {
     report(e);
   } finally {
