@@ -14,6 +14,7 @@ for (const file of [
   "archive-export",
   "archive-parts",
   "archive-tags",
+  "archive-tag-comment",
   "tags",
 ]) {
   const source = await fs.readFile(`lib/${file}.ts`, "utf8");

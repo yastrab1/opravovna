@@ -4,6 +4,9 @@ import path from "node:path";
 import JSZip from "jszip";
 import { prepareExportRuntime } from "./support/runtime.mjs";
 const root = await prepareExportRuntime("export-parts-runtime");
+const { readTagComment } = await import(
+  path.join(root, "dist/export/archive-tag-comment.mjs")
+);
 const { createExporter } = await import(path.join(root, "exporter.mjs"));
 const bytes = new TextEncoder().encode("%PDF-" + "test".repeat(2000));
 const source = new JSZip();
@@ -79,6 +82,9 @@ try {
     assert.equal(Number(response.headers.get("Content-Length")), part.bytes);
     const zip = await JSZip.loadAsync(await response.arrayBuffer());
     const points = JSON.parse(await zip.file("/points.json").async("string"));
+    assert.deepEqual(Object.keys(points).sort(), ["criteria", "scores"]);
+    const legacy = {};
+    await readTagComment(zip, legacy);
     assert.deepEqual(points.criteria, { x: "criterion" });
     assert.equal(Object.keys(points.scores).length, part.count);
     assert.equal(Object.keys(zip.files).length, part.count + 1);
@@ -88,7 +94,7 @@ try {
       const document = documents.find((d) => d.metadata.submissionId === id);
       assert.equal(score.points, document.state.scoring.points);
       assert.deepEqual(score.comments, document.state.scoring.comments);
-      assert.deepEqual(points.opravovna.submissions[id], ["uf"]);
+      assert.deepEqual(legacy.changes[id].tags, ["uf"]);
       assert.deepEqual(
         await zip.file(document.path.split("/").pop()).async("uint8array"),
         bytes,

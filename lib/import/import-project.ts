@@ -1,3 +1,4 @@
+import { readTagComment } from "../archive-tag-comment";
 import { importTagMetadata } from "../archive-tags";
 import { writeImportedVersion } from "./write-version";
 import { uploadArchive } from "./upload-archive";
@@ -54,7 +55,9 @@ export async function importZip(
     const zip = await JSZip.loadAsync(file);
     const entries = Object.values(zip.files).filter((x) => !x.dir);
     let total = 0;
-    let pdfs = entries.filter((x) => parseSubmission(x.name));
+    let pdfs = entries.filter(
+      (x) => /\.pdf$/i.test(x.name) && parseSubmission(x.name),
+    );
     const gradedOnly = !pdfs.length;
     if (gradedOnly)
       pdfs = entries.filter(
@@ -133,6 +136,7 @@ export async function importZip(
         };
       }
     }
+    await readTagComment(zip, incomingLegacy);
     let sidecar: any = {};
     if (zip.file("opravovna.json")) {
       sidecar = JSON.parse(await zip.file("opravovna.json")!.async("string"));

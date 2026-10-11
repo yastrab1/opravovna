@@ -1,4 +1,5 @@
 import { exportTagMetadata } from "./archive-tags";
+import { writeTagComment } from "./archive-tag-comment";
 import type JSZip from "jszip";
 
 export function gradedDocuments(documents: any[]) {
@@ -23,12 +24,12 @@ export async function writePoints(
     (entry) =>
       !entry.dir && /(^|\/)points?\.json$/i.test(entry.name.replace(/^\//, "")),
   );
-  let points: any = { criteria: {}, scores: {} };
+  const points: any = { criteria: {}, scores: {} };
   if (original) {
     try {
       const parsed = JSON.parse(await original.async("string"));
       if (parsed && typeof parsed === "object")
-        points = { ...points, ...parsed, scores: {} };
+        points.criteria = parsed.criteria ?? {};
     } catch {
       /* Older archives may not have usable scores. */
     }
@@ -50,9 +51,9 @@ export async function writePoints(
       comments: scoring.comments ?? [...comments, `${scoring.points}B`],
     };
   }
-  points.opravovna = exportTagMetadata(documents, legacy.tags ?? []);
+  await writeTagComment(zip, exportTagMetadata(documents, legacy.tags ?? []));
   // Arnold uses this literal root entry, including its leading slash.
-  zip.file("/points.json", JSON.stringify(points, null, 2));
+  zip.file("/points.json", JSON.stringify(points, null, "\t"));
 }
 
 export function addGradedPdf(zip: JSZip, document: any, bytes: Uint8Array) {
