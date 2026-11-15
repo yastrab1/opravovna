@@ -41,7 +41,7 @@ if (run("git", ["status", "--porcelain"], true))
 checks();
 const revision = run("git", ["rev-parse", "--short=12", "HEAD"], true);
 const host = process.env.DEPLOY_HOST || "r2d2@r2d2";
-const stack = process.env.DEPLOY_STACK || "/home/r2d2/unified";
+const stack = process.env.DEPLOY_STACK || "/home/r2d2/personal/opravovna";
 const image = process.env.DEPLOY_IMAGE || "ghcr.io/yastrab1/opravovna";
 const backupRoot =
   process.env.DEPLOY_BACKUP_ROOT || "/mnt/data/backups/opravovna";
@@ -74,7 +74,7 @@ run("ssh", ["-o", "BatchMode=yes", host, "docker", "pull", pinned]);
 const remote = `
 import pathlib, re, shutil, subprocess, urllib.request, time
 stack=pathlib.Path(${JSON.stringify(stack)})
-compose=stack/'personal-project.compose.yml'
+compose=stack/'compose.yml'
 original=compose.read_text()
 pattern=r'(?m)^(    image: )'+re.escape(${JSON.stringify(image)})+r'@sha256:[a-f0-9]{64}$'
 updated,count=re.subn(pattern,lambda m:m.group(1)+${JSON.stringify(pinned)},original)
@@ -85,8 +85,8 @@ backup.mkdir(parents=True,mode=0o700)
 shutil.copy2(compose,backup/compose.name)
 backup_namespace={'__name__':'backup_module'}
 exec(${JSON.stringify(readFileSync("scripts/backup-state.py", "utf8"))}, backup_namespace)
-backup_namespace['backup_state'](stack/'data'/'opravovna',backup/'state')
-command=['docker','compose','-f','docker-compose.apps.yml','-f','docker-compose.config-api.yml','up','-d','--no-deps','opravovna']
+backup_namespace['backup_state'](stack/'data',backup/'state')
+command=['docker','compose','up','-d','--no-deps','opravovna']
 def healthy():
     for attempt in range(30):
         try:

@@ -12,18 +12,18 @@ node --env-file=.env.production scripts/build-container.mjs ghcr.io/yastrab1/opr
 
 Configure `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `APP_ORIGIN` in the runtime environment. The public origin must match your Clerk production domain. Clerk's Google sign-in needs your own OAuth credentials, configured in Clerk and Google Cloud.
 
-Use [personal-project.compose.yml](personal-project.compose.yml) as a template for the app and Cloudflare Tunnel. Mount the tunnel configuration and tunnel-specific credentials, rather than the account-wide Cloudflare certificate. Persistent storage must be writable by UID/GID 1000.
+Use [compose.yml](compose.yml) as a template for the app and Cloudflare Tunnel. Mount the tunnel configuration and tunnel-specific credentials, rather than the account-wide Cloudflare certificate. Persistent storage must be writable by UID/GID 1000.
 
 Pin a tested image digest for deployment. Keep the previous digest for rollback. The self-hosted Workers compatibility date is pinned to `2026-05-15` so build-tool updates cannot silently exceed the runtime binary's supported date. Only override `WORKER_COMPATIBILITY_DATE` after testing an updated runtime.
 
-## Existing unified stack
+## Live stack
 
-The live instance uses `/home/r2d2/unified/personal-project.compose.yml`, included by the unified `apps` stack. Update only the Opravovna service:
+Opravovňa is a personal project and runs as its own Compose project `opravovna` in `/home/r2d2/personal/opravovna` on r2d2, separate from the Aerostacks `unified` stack. Update only the app service:
 
 ```sh
-cd /home/r2d2/unified
-docker compose -f docker-compose.apps.yml -f docker-compose.config-api.yml up -d --no-deps opravovna
-docker compose -f docker-compose.apps.yml -f docker-compose.config-api.yml logs --tail=50 opravovna
+cd /home/r2d2/personal/opravovna
+docker compose up -d --no-deps opravovna
+docker compose logs --tail=50 opravovna
 curl -f http://127.0.0.1:8791/healthz
 ```
 
@@ -33,9 +33,9 @@ Only one app instance should write to a given data directory. Do not run a secon
 
 ## Persistent files and backups
 
-- `data/opravovna/`: database and PDF/archive blobs. For an existing Wrangler migration, use the contents of `.wrangler/state/v3`, preserving binding IDs.
+- `data/`: database and PDF/archive blobs. For an existing Wrangler migration, use the contents of `.wrangler/state/v3`, preserving binding IDs.
 - `secrets/opravovna.env`: runtime Clerk keys, readable only by the service account.
-- `secrets/opravovna-tunnel/`: tunnel-specific credentials and ingress configuration.
+- `secrets/tunnel/`: tunnel-specific credentials and ingress configuration.
 - `/mnt/data/backups/opravovna/`: full verified PDF/archive and database backups on the data disk, kept outside the repository.
 
 Stop the app before copying the complete data directory to obtain a consistent snapshot of SQLite WAL files and blob metadata. Back up secrets separately. Restore the entire snapshot with UID/GID 1000 ownership, then start the app. Keep database, keys and image compatible when rolling back an authentication migration.
