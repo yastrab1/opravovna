@@ -1,17 +1,20 @@
+# Personal project (not Aerostacks). Deploy: yastrab1/opravovna scripts/deploy.mjs
+name: opravovna
+
 services:
   opravovna:
-    image: ${OPRAVOVNA_IMAGE:-ghcr.io/yastrab1/opravovna:production}
+    image: ghcr.io/yastrab1/opravovna@sha256:<pinned-by-deploy>
     restart: unless-stopped
     init: true
     user: "1000:1000"
     env_file:
-      - /home/r2d2/unified/secrets/opravovna.env
+      - ./secrets/opravovna.env
     environment:
       APP_ORIGIN: https://opravovna.tech
       DATA_DIR: /data
       EXPORT_WORKERS: "12"
     volumes:
-      - /home/r2d2/unified/data/opravovna:/data
+      - ./data:/data
     ports:
       - "127.0.0.1:8791:8787"
     networks:
@@ -27,7 +30,7 @@ services:
         max-size: 10m
         max-file: "3"
   opravovna-tunnel:
-    image: cloudflare/cloudflared:2026.10.0
+    image: cloudflare/cloudflared@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
     restart: unless-stopped
     user: "1000:1000"
     command: ["tunnel", "--no-autoupdate", "--config", "/etc/cloudflared/config.yml", "run"]
@@ -35,7 +38,7 @@ services:
       opravovna:
         condition: service_healthy
     volumes:
-      - /home/r2d2/unified/secrets/opravovna-tunnel:/etc/cloudflared:ro
+      - ./secrets/tunnel:/etc/cloudflared:ro
     networks:
       - opravovna
     security_opt:

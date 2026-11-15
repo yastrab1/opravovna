@@ -8,7 +8,7 @@ await mkdir(directory + "/bin", { recursive: true });
 const server = createServer(async (req, res) => {
   if (req.url.startsWith("/health-fail")) {
     const compose = await readFile(
-      directory + "/health-fail/personal-project.compose.yml",
+      directory + "/health-fail/compose.yml",
       "utf8",
     );
     res.statusCode = compose.includes("2".repeat(64)) ? 503 : 200;
@@ -32,27 +32,27 @@ for (const name of ["npm", "git", "docker", "ssh"])
   await writeFile(directory + "/bin/" + name, shim, { mode: 0o755 });
 const run = async (mode) => {
   const stack = directory + "/" + mode;
-  await mkdir(stack + "/data/opravovna", { recursive: true });
+  await mkdir(stack + "/data", { recursive: true });
   const db = spawnSync("python3", [
     "-c",
     "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute('create table demo(value)'); db.execute('insert into demo values(1)'); db.commit()",
-    stack + "/data/opravovna/state.sqlite",
+    stack + "/data/state.sqlite",
   ]);
   assert.equal(db.status, 0);
   await writeFile(
-    stack + "/data/opravovna/example.pdf",
+    stack + "/data/example.pdf",
     "%PDF-synthetic-backup",
   );
   if (mode === "missing-blob") {
     const setup = spawnSync("python3", [
       "-c",
       "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute('create table _mf_objects(key,blob_id,size)'); db.execute(\"insert into _mf_objects values('pdf','missing-blob',3)\"); db.commit()",
-      stack + "/data/opravovna/state.sqlite",
+      stack + "/data/state.sqlite",
     ]);
     assert.equal(setup.status, 0);
   }
   const initial = `services:\n  opravovna:\n    image: ${old}\n`;
-  await writeFile(stack + "/personal-project.compose.yml", initial);
+  await writeFile(stack + "/compose.yml", initial);
   const env = {
     ...process.env,
     PATH: directory + "/bin:" + process.env.PATH,
@@ -73,7 +73,7 @@ const run = async (mode) => {
   const status = await new Promise((r) => child.once("exit", r));
   if (mode === "success") assert.equal(status, 0, output);
   const compose = await readFile(
-      stack + "/personal-project.compose.yml",
+      stack + "/compose.yml",
       "utf8",
     ),
     commands = (await readFile(stack + "/commands.jsonl", "utf8"))
